@@ -1,5 +1,6 @@
 package org.cgutman.usbip.config;
 
+import org.cgutman.usbip.relay.RelayController;
 import org.cgutman.usbip.service.UsbIpService;
 import org.cgutman.usbipserverforandroid.R;
 
@@ -25,7 +26,11 @@ public class UsbIpConfig extends ComponentActivity {
 	private Button serviceButton;
 	private TextView serviceStatus;
 	private TextView serviceReadyText;
-	
+
+	private Button relayToggle;
+	private TextView relayStatus;
+	private RelayController relayController;
+
 	private boolean running;
 
 	private ActivityResultLauncher<String> requestPermissionLauncher =
@@ -66,11 +71,13 @@ public class UsbIpConfig extends ComponentActivity {
 		serviceButton = findViewById(R.id.serviceButton);
 		serviceStatus = findViewById(R.id.serviceStatus);
 		serviceReadyText = findViewById(R.id.serviceReadyText);
-		
+		relayToggle = findViewById(R.id.relay_toggle);
+		relayStatus = findViewById(R.id.relayStatus);
+
 		running = isMyServiceRunning(UsbIpService.class);
-		
+
 		updateStatus();
-		
+
 		serviceButton.setOnClickListener(new OnClickListener() {
 			@Override
 			public void onClick(View v) {
@@ -84,10 +91,53 @@ public class UsbIpConfig extends ComponentActivity {
 						requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
 					}
 				}
-				
+
 				running = !running;
 				updateStatus();
 			}
 		});
+
+		// Relay: manually bridge the local USB/IP server through the encrypted relay.
+		relayController = new RelayController(this);
+		relayController.setStateListener(new RelayController.StateListener() {
+			@Override
+			public void onRelayState(RelayController.State state) {
+				updateRelayStatus(state);
+			}
+		});
+		updateRelayStatus(relayController.getState());
+
+		relayToggle.setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				if (relayController.isRunning()) {
+					relayController.stop();
+				} else {
+					relayController.start();
+				}
+			}
+		});
+	}
+
+	private void updateRelayStatus(RelayController.State state) {
+		switch (state) {
+			case CONNECTING:
+				relayStatus.setText("Relay: connecting...");
+				relayToggle.setText("Stop Relay");
+				break;
+			case ON:
+				relayStatus.setText("Relay: on");
+				relayToggle.setText("Stop Relay");
+				break;
+			case ERROR:
+				relayStatus.setText("Relay: error (see logcat tag wsusb)");
+				relayToggle.setText("Relay (remote USB)");
+				break;
+			case OFF:
+			default:
+				relayStatus.setText("Relay: off");
+				relayToggle.setText("Relay (remote USB)");
+				break;
+		}
 	}
 }

@@ -24,6 +24,15 @@ android {
             path "src/main/jni/Android.mk"
         }
     }
+
+    // Keep native libs extracted to disk (extractNativeLibs=true). Required so that
+    // libusbws.so can be executed as a separate process from nativeLibraryDir.
+    // Without this, Android 6+ memory-maps .so straight from the APK and exec() fails.
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 dependencies {

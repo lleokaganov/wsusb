@@ -42,3 +42,6 @@ app/.externalNativeBuild/
 
 # NDK stuff
 .cxx/
+
+# usbws relay integration: device PRIVATE identity seed — must never be committed
+app/src/main/assets/usbws_identity
