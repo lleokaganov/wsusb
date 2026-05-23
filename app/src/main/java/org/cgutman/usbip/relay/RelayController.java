@@ -1,15 +1,13 @@
 package org.cgutman.usbip.relay;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.util.Log;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 
 /**
  * Drives the bundled usbws native binary (libusbws.so) to bridge the local
@@ -19,8 +17,14 @@ import java.io.OutputStream;
  * nativeLibraryDir at install time (extractNativeLibs=true), which is the only
  * place from which Android allows executing a process.
  *
- * START spawns:  libusbws.so tcp-connect 127.0.0.1:3240 --peer DEV_INVITE
- * with env USBWS_IDENTITY pointing at a per-app copy of the bundled identity.
+ * START spawns:  libusbws.so tcp-connect 127.0.0.1:3240 --peer <peerInvite>
+ * with env USBWS_IDENTITY pointing at a per-device identity file in filesDir.
+ *
+ * Identity is unique per install: usbws performs load-or-create on the path in
+ * USBWS_IDENTITY, so the keypair is generated on this device the first time
+ * keygen (or tcp-connect) runs, and persists across restarts. The invite to
+ * hand to the remote side is produced by {@link #generateInvite()}; the peer
+ * invite to connect to is stored in SharedPreferences by the settings screen.
  */
 public class RelayController {
     private static final String TAG = "wsusb";
@@ -29,15 +33,16 @@ public class RelayController {
     // the build system bundles it and Android extracts it).
     private static final String BINARY_NAME = "libusbws.so";
 
-    // Asset shipped in app/src/main/assets, copied to filesDir on first use.
-    private static final String IDENTITY_ASSET = "usbws_identity";
+    // Per-device identity file (load-or-create by usbws). Lives in filesDir so it
+    // is unique to this install and never bundled in the APK.
+    private static final String IDENTITY_FILE = "usbws_identity";
+
+    // SharedPreferences storage for the relay configuration.
+    public static final String PREFS_NAME = "relay_prefs";
+    public static final String PREF_PEER_INVITE = "peer_invite";
 
     // Local TCP endpoint of the USB/IP server (UsbIpServer.PORT == 3240).
     private static final String LOCAL_ENDPOINT = "127.0.0.1:3240";
-
-    // Fixed dev peer invite (relay URL ws://ws.lleo.me/api0 is baked into usbws).
-    public static final String DEV_INVITE =
-            "K0O2cik71n0Fox64QYG68RYKVnaGIDqhYLd7uqhr9bqBsA7v3fGUsKXvnNyM3K3Q9oP5P2kkCteaoh6vkTirVvlnVzYndz";
 
     /** Relay lifecycle state for the UI. */
     public enum State {
@@ -77,13 +82,106 @@ public class RelayController {
         return process != null;
     }
 
+    /** Returns the saved peer invite, or an empty string if none is set. */
+    public String getPeerInvite() {
+        SharedPreferences prefs =
+                appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getString(PREF_PEER_INVITE, "");
+    }
+
+    /** Persists the peer invite to connect to. */
+    public void setPeerInvite(String invite) {
+        SharedPreferences prefs =
+                appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putString(PREF_PEER_INVITE, invite == null ? "" : invite.trim()).apply();
+    }
+
+    /** Absolute path to the per-device identity file in filesDir. */
+    private File identityFile() {
+        return new File(appContext.getFilesDir(), IDENTITY_FILE);
+    }
+
+    private String binaryPath() {
+        return appContext.getApplicationInfo().nativeLibraryDir
+                + File.separator + BINARY_NAME;
+    }
+
+    /**
+     * Runs `libusbws.so keygen`, which load-or-creates the per-device identity
+     * and prints this device's invite ("K0...") on stdout (with human notes on
+     * stderr). Returns the invite string, or null on failure.
+     *
+     * Safe to call repeatedly: keygen is idempotent once the identity exists.
+     * Blocks briefly; call off the UI thread.
+     */
+    public String generateInvite() {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(binaryPath(), "keygen");
+            pb.environment().put("USBWS_IDENTITY", identityFile().getAbsolutePath());
+            // Keep stdout (the invite) separate from stderr (human notes).
+            pb.redirectErrorStream(false);
+
+            Process p = pb.start();
+
+            // Read stdout: the invite is printed there as a single line.
+            String invite = null;
+            BufferedReader out = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            try {
+                String line;
+                while ((line = out.readLine()) != null) {
+                    line = line.trim();
+                    if (line.startsWith("K0")) {
+                        invite = line;
+                    }
+                }
+            } finally {
+                try {
+                    out.close();
+                } catch (IOException ignored) {
+                }
+            }
+
+            // Drain stderr to logcat (id, file location, notes).
+            BufferedReader err = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+            try {
+                String line;
+                while ((line = err.readLine()) != null) {
+                    Log.i(TAG, "keygen: " + line);
+                }
+            } finally {
+                try {
+                    err.close();
+                } catch (IOException ignored) {
+                }
+            }
+
+            int exit = p.waitFor();
+            if (exit != 0) {
+                Log.e(TAG, "keygen exited with code " + exit);
+            }
+            return invite;
+        } catch (IOException | InterruptedException e) {
+            Log.e(TAG, "failed to run keygen", e);
+            return null;
+        }
+    }
+
     /**
      * Starts the relay process. Returns immediately; actual startup happens on a
      * background thread and is reported via the StateListener.
+     *
+     * Does nothing (logs and reports ERROR) if no peer invite is configured.
      */
     public synchronized void start() {
         if (process != null) {
             // Already running.
+            return;
+        }
+
+        final String peerInvite = getPeerInvite();
+        if (peerInvite == null || peerInvite.isEmpty()) {
+            Log.w(TAG, "cannot start relay: peer invite not set");
+            setState(State.ERROR);
             return;
         }
 
@@ -92,7 +190,7 @@ public class RelayController {
         Thread starter = new Thread(new Runnable() {
             @Override
             public void run() {
-                startInternal();
+                startInternal(peerInvite);
             }
         }, "usbws-starter");
         starter.start();
@@ -132,17 +230,17 @@ public class RelayController {
         setState(State.OFF);
     }
 
-    private void startInternal() {
+    private void startInternal(String peerInvite) {
         try {
-            File identity = ensureIdentity();
-            String binaryPath = appContext.getApplicationInfo().nativeLibraryDir
-                    + File.separator + BINARY_NAME;
+            File identity = identityFile();
+            String binaryPath = binaryPath();
 
             ProcessBuilder pb = new ProcessBuilder(
                     binaryPath,
                     "tcp-connect",
                     LOCAL_ENDPOINT,
-                    "--peer", DEV_INVITE);
+                    "--peer", peerInvite);
+            // usbws load-or-creates this identity, so it exists after the first run.
             pb.environment().put("USBWS_IDENTITY", identity.getAbsolutePath());
             pb.redirectErrorStream(true);
 
@@ -210,46 +308,6 @@ public class RelayController {
                 setState(State.OFF);
             }
         }
-    }
-
-    /**
-     * Copies the bundled usbws identity from assets to filesDir on first use.
-     * Returns the on-disk identity file.
-     */
-    private File ensureIdentity() throws IOException {
-        File dest = new File(appContext.getFilesDir(), IDENTITY_ASSET);
-        if (dest.exists() && dest.length() > 0) {
-            return dest;
-        }
-
-        InputStream in = null;
-        OutputStream out = null;
-        try {
-            in = appContext.getAssets().open(IDENTITY_ASSET);
-            out = new FileOutputStream(dest);
-            byte[] buf = new byte[4096];
-            int n;
-            while ((n = in.read(buf)) > 0) {
-                out.write(buf, 0, n);
-            }
-            out.flush();
-        } finally {
-            if (in != null) {
-                try {
-                    in.close();
-                } catch (IOException ignored) {
-                }
-            }
-            if (out != null) {
-                try {
-                    out.close();
-                } catch (IOException ignored) {
-                }
-            }
-        }
-
-        Log.i(TAG, "copied usbws identity to " + dest.getAbsolutePath());
-        return dest;
     }
 
     /** Updates state and notifies the listener on the UI thread. */

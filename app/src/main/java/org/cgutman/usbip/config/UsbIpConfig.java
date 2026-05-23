@@ -7,15 +7,20 @@ import org.cgutman.usbipserverforandroid.R;
 import android.Manifest;
 import android.app.ActivityManager;
 import android.app.ActivityManager.RunningServiceInfo;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.ComponentActivity;
 import androidx.activity.result.ActivityResultLauncher;
@@ -30,6 +35,11 @@ public class UsbIpConfig extends ComponentActivity {
 	private Button relayToggle;
 	private TextView relayStatus;
 	private RelayController relayController;
+
+	private TextView myInvite;
+	private Button copyInviteButton;
+	private EditText peerInviteEdit;
+	private Button savePeerButton;
 
 	private boolean running;
 
@@ -73,6 +83,10 @@ public class UsbIpConfig extends ComponentActivity {
 		serviceReadyText = findViewById(R.id.serviceReadyText);
 		relayToggle = findViewById(R.id.relay_toggle);
 		relayStatus = findViewById(R.id.relayStatus);
+		myInvite = findViewById(R.id.myInvite);
+		copyInviteButton = findViewById(R.id.copyInviteButton);
+		peerInviteEdit = findViewById(R.id.peerInviteEdit);
+		savePeerButton = findViewById(R.id.savePeerButton);
 
 		running = isMyServiceRunning(UsbIpService.class);
 
@@ -113,7 +127,66 @@ public class UsbIpConfig extends ComponentActivity {
 				if (relayController.isRunning()) {
 					relayController.stop();
 				} else {
+					if (relayController.getPeerInvite().isEmpty()) {
+						Toast.makeText(UsbIpConfig.this,
+								"Set the peer invite first", Toast.LENGTH_LONG).show();
+						return;
+					}
 					relayController.start();
+				}
+			}
+		});
+
+		// Load the saved peer invite into the edit field.
+		peerInviteEdit.setText(relayController.getPeerInvite());
+
+		// Generate (or load) this device's invite off the UI thread, then show it.
+		myInvite.setText("(generating...)");
+		final Handler ui = new Handler(getMainLooper());
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				final String invite = relayController.generateInvite();
+				ui.post(new Runnable() {
+					@Override
+					public void run() {
+						myInvite.setText(invite != null ? invite
+								: "(failed to generate invite, see logcat tag wsusb)");
+					}
+				});
+			}
+		}, "usbws-keygen").start();
+
+		copyInviteButton.setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				String invite = myInvite.getText().toString();
+				if (invite.startsWith("K0")) {
+					ClipboardManager cm =
+							(ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+					cm.setPrimaryClip(ClipData.newPlainText("usbws invite", invite));
+					Toast.makeText(UsbIpConfig.this,
+							"Invite copied", Toast.LENGTH_SHORT).show();
+				} else {
+					Toast.makeText(UsbIpConfig.this,
+							"Invite not ready yet", Toast.LENGTH_SHORT).show();
+				}
+			}
+		});
+
+		savePeerButton.setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				String invite = peerInviteEdit.getText().toString().trim();
+				if (invite.isEmpty() || invite.startsWith("K0")) {
+					relayController.setPeerInvite(invite);
+					Toast.makeText(UsbIpConfig.this,
+							invite.isEmpty() ? "Peer invite cleared" : "Peer invite saved",
+							Toast.LENGTH_SHORT).show();
+				} else {
+					Toast.makeText(UsbIpConfig.this,
+							"That does not look like an invite (should start with K0)",
+							Toast.LENGTH_LONG).show();
 				}
 			}
 		});
