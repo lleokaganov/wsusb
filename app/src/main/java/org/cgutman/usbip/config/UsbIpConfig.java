@@ -51,13 +51,16 @@ public class UsbIpConfig extends ComponentActivity {
 	
 	private void updateStatus() {
 		if (running) {
-			serviceButton.setText("Stop Service");
-			serviceStatus.setText("USB/IP Service Running");
+			// Step 1 is active: the on-phone USB/IP server is exposing the device.
+			serviceButton.setText(R.string.step1_button_stop);
+			serviceStatus.setText(R.string.usb_server_running);
+			serviceStatus.setTextColor(ContextCompat.getColor(this, R.color.status_ok));
 			serviceReadyText.setText(R.string.ready_text);
 		}
 		else {
-			serviceButton.setText("Start Service");
-			serviceStatus.setText("USB/IP Service Stopped");
+			serviceButton.setText(R.string.step1_button);
+			serviceStatus.setText(R.string.usb_server_stopped);
+			serviceStatus.setTextColor(ContextCompat.getColor(this, R.color.status_idle));
 			serviceReadyText.setText("");
 		}
 	}
@@ -195,21 +198,25 @@ public class UsbIpConfig extends ComponentActivity {
 	private void updateRelayStatus(RelayController.State state) {
 		switch (state) {
 			case CONNECTING:
-				relayStatus.setText("Relay: connecting...");
-				relayToggle.setText("Stop Relay");
+				relayStatus.setText(R.string.relay_connecting);
+				relayStatus.setTextColor(ContextCompat.getColor(this, R.color.status_idle));
+				relayToggle.setText(R.string.step2_button_stop);
 				break;
 			case ON:
-				relayStatus.setText("Relay: on");
-				relayToggle.setText("Stop Relay");
+				relayStatus.setText(R.string.relay_connected);
+				relayStatus.setTextColor(ContextCompat.getColor(this, R.color.status_ok));
+				relayToggle.setText(R.string.step2_button_stop);
 				break;
 			case ERROR:
-				relayStatus.setText("Relay: error (see logcat tag wsusb)");
-				relayToggle.setText("Relay (remote USB)");
+				relayStatus.setText(R.string.relay_error);
+				relayStatus.setTextColor(ContextCompat.getColor(this, R.color.status_idle));
+				relayToggle.setText(R.string.step2_button);
 				break;
 			case OFF:
 			default:
-				relayStatus.setText("Relay: off");
-				relayToggle.setText("Relay (remote USB)");
+				relayStatus.setText(R.string.relay_off);
+				relayStatus.setTextColor(ContextCompat.getColor(this, R.color.status_idle));
+				relayToggle.setText(R.string.step2_button);
 				break;
 		}
 	}

@@ -1,113 +1,209 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="fill_parent"
-    android:layout_height="fill_parent"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
     android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingBottom="@dimen/activity_vertical_margin"
-        android:paddingLeft="@dimen/activity_horizontal_margin"
-        android:paddingRight="@dimen/activity_horizontal_margin"
-        android:paddingTop="@dimen/activity_vertical_margin">
+        android:paddingBottom="32dp"
+        android:paddingLeft="24dp"
+        android:paddingRight="24dp"
+        android:paddingTop="28dp">
 
+        <!-- ===== Title / tagline ===== -->
         <TextView
-            android:id="@+id/serviceStatus"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:textAppearance="?android:attr/textAppearanceLarge" />
-
-        <Button
-            android:id="@+id/serviceButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal" />
-
-        <TextView
-            android:id="@+id/serviceReadyText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:gravity="center"
-            android:textAppearance="?android:attr/textAppearanceMedium" />
+            android:text="@string/app_title"
+            android:textSize="30sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="@string/app_tagline"
+            android:textColor="@color/tagline"
+            android:textSize="14sp" />
+
+        <!-- =============================================================
+             SECTION 1 — YOUR INVITE (copy, give to peer)
+             ============================================================= -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:letterSpacing="0.08"
+            android:text="@string/section_your_invite"
+            android:textColor="@color/section_heading"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:layout_marginTop="24dp"
-            android:layout_marginBottom="16dp"
-            android:background="?android:attr/listDivider" />
-
-        <!-- Your invite: hand this to the remote (home) side. -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Your invite (give this to the remote side)"
-            android:textAppearance="?android:attr/textAppearanceSmall" />
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="12dp"
+            android:background="@color/separator" />
 
         <TextView
-            android:id="@+id/myInvite"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textIsSelectable="true"
-            android:typeface="monospace"
-            android:textSize="12sp"
-            android:text="(generating...)" />
+            android:text="@string/your_invite_hint"
+            android:textColor="@color/helper_text"
+            android:textSize="13sp" />
 
-        <Button
-            android:id="@+id/copyInviteButton"
-            android:layout_width="wrap_content"
+        <!-- Read-only invite field: faint fill + padding make it look non-editable. -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Copy" />
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <!-- Peer invite: who this device connects to. -->
+            <TextView
+                android:id="@+id/myInvite"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@color/readonly_field_bg"
+                android:padding="10dp"
+                android:text="(generating...)"
+                android:textIsSelectable="true"
+                android:textSize="12sp"
+                android:typeface="monospace" />
+
+            <Button
+                android:id="@+id/copyInviteButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_marginLeft="10dp"
+                android:minWidth="88dp"
+                android:text="@string/copy" />
+        </LinearLayout>
+
+        <!-- =============================================================
+             SECTION 2 — PEER (paste, save)
+             ============================================================= -->
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="Peer invite (who to connect to)"
-            android:textAppearance="?android:attr/textAppearanceSmall" />
+            android:layout_marginTop="28dp"
+            android:letterSpacing="0.08"
+            android:text="@string/section_peer"
+            android:textColor="@color/section_heading"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="12dp"
+            android:background="@color/separator" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/peer_hint"
+            android:textColor="@color/helper_text"
+            android:textSize="13sp" />
 
         <EditText
             android:id="@+id/peerInviteEdit"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:hint="Paste the remote side's invite (K0...)"
+            android:layout_marginTop="10dp"
+            android:hint="@string/peer_invite_field_hint"
             android:inputType="textNoSuggestions"
-            android:typeface="monospace"
-            android:textSize="12sp" />
+            android:textSize="12sp"
+            android:typeface="monospace" />
 
         <Button
             android:id="@+id/savePeerButton"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Save" />
+            android:layout_marginTop="8dp"
+            android:text="@string/save" />
+
+        <!-- =============================================================
+             SECTION 3 — CONTROLS (step 1 then step 2, in usage order)
+             ============================================================= -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:letterSpacing="0.08"
+            android:text="@string/section_controls"
+            android:textColor="@color/section_heading"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:layout_marginTop="24dp"
-            android:layout_marginBottom="16dp"
-            android:background="?android:attr/listDivider" />
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="12dp"
+            android:background="@color/separator" />
+
+        <!-- Step 1: start the on-phone USB/IP server (cgutman's serviceButton). -->
+        <Button
+            android:id="@+id/serviceButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/step1_button" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/step1_helper"
+            android:textColor="@color/helper_text"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/serviceStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <!-- Extra hint shown once the USB server is running. -->
+        <TextView
+            android:id="@+id/serviceReadyText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/helper_text"
+            android:textSize="13sp" />
+
+        <!-- Step 2: open the encrypted relay tunnel (relay_toggle). -->
+        <Button
+            android:id="@+id/relay_toggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="@string/step2_button" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/step2_helper"
+            android:textColor="@color/helper_text"
+            android:textSize="13sp" />
 
         <TextView
             android:id="@+id/relayStatus"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal" />
-
-        <Button
-            android:id="@+id/relay_toggle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:text="Relay (remote USB)" />
+            android:layout_marginTop="4dp"
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
     </LinearLayout>
 
