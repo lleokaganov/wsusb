@@ -205,6 +205,40 @@
             android:textSize="14sp"
             android:textStyle="bold" />
 
+        <!-- =============================================================
+             SECTION 4 — APP (version + self-update)
+             ============================================================= -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:letterSpacing="0.08"
+            android:text="@string/section_app"
+            android:textColor="@color/section_heading"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="12dp"
+            android:background="@color/separator" />
+
+        <TextView
+            android:id="@+id/appVersion"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/helper_text"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/updateButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/check_for_updates" />
+
     </LinearLayout>
 
 </ScrollView>

@@ -1,6 +1,7 @@
 package org.cgutman.usbip.config;
 
 import org.cgutman.usbip.relay.RelayController;
+import org.cgutman.usbip.relay.Updater;
 import org.cgutman.usbip.service.UsbIpService;
 import org.cgutman.usbipserverforandroid.R;
 
@@ -40,6 +41,9 @@ public class UsbIpConfig extends ComponentActivity {
 	private Button copyInviteButton;
 	private EditText peerInviteEdit;
 	private Button savePeerButton;
+
+	private TextView appVersion;
+	private Button updateButton;
 
 	private boolean running;
 
@@ -90,6 +94,8 @@ public class UsbIpConfig extends ComponentActivity {
 		copyInviteButton = findViewById(R.id.copyInviteButton);
 		peerInviteEdit = findViewById(R.id.peerInviteEdit);
 		savePeerButton = findViewById(R.id.savePeerButton);
+		appVersion = findViewById(R.id.appVersion);
+		updateButton = findViewById(R.id.updateButton);
 
 		running = isMyServiceRunning(UsbIpService.class);
 
@@ -191,6 +197,19 @@ public class UsbIpConfig extends ComponentActivity {
 							"That does not look like an invite (should start with K0)",
 							Toast.LENGTH_LONG).show();
 				}
+			}
+		});
+
+		// App section: show the installed version and offer an in-app self-update.
+		int versionCode = Updater.getInstalledVersionCode(this);
+		String versionName = Updater.getInstalledVersionName(this);
+		appVersion.setText(getString(R.string.app_version_label)
+				+ " " + versionCode + " (" + versionName + ")");
+
+		updateButton.setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				Updater.checkForUpdate(UsbIpConfig.this);
 			}
 		});
 	}
