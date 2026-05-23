@@ -28,7 +28,6 @@ import android.os.Handler;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -42,10 +41,12 @@ import androidx.core.content.ContextCompat;
  *
  * Interaction model (modeled on serial-USB-terminal "capture"): the app detects
  * the plugged-in USB device, shows it, and auto-raises the tunnel. There are no
- * per-action confirmations. Whenever BOTH a USB device is attached AND a peer
- * invite is set, the on-phone USB/IP server (cgutman's service) and the relay
- * are started automatically. When the device is unplugged, the relay is stopped.
- * The single "Stop sharing" button is a manual override.
+ * per-action confirmations. Whenever a USB device is attached, the on-phone
+ * USB/IP server (cgutman's service) and the relay (accept-incoming mode) are
+ * started automatically — no peer needs to be configured. The first remote
+ * computer that connects knowing this device's invite becomes its owner. When
+ * the device is unplugged, the relay is stopped. The single "Stop sharing"
+ * button is a manual override.
  */
 public class UsbIpConfig extends ComponentActivity {
 	// DEVICE section.
@@ -56,11 +57,12 @@ public class UsbIpConfig extends ComponentActivity {
 	// Relay (encrypted tunnel) controller — drives libusbws.so.
 	private RelayController relayController;
 
-	// YOUR INVITE / PEER sections.
+	// YOUR INVITE section.
 	private TextView myInvite;
 	private Button copyInviteButton;
-	private EditText peerInviteEdit;
-	private Button savePeerButton;
+
+	// OWNERS section.
+	private TextView ownersList;
 
 	// APP section.
 	private TextView appVersion;
@@ -109,7 +111,7 @@ public class UsbIpConfig extends ComponentActivity {
 				if (autoRaisePending) {
 					autoRaisePending = false;
 					startServiceNow();
-					startRelayIfConfigured();
+					startRelayNow();
 					updateUi();
 				}
 			});
@@ -126,8 +128,7 @@ public class UsbIpConfig extends ComponentActivity {
 		stopSharingButton = findViewById(R.id.stopSharingButton);
 		myInvite = findViewById(R.id.myInvite);
 		copyInviteButton = findViewById(R.id.copyInviteButton);
-		peerInviteEdit = findViewById(R.id.peerInviteEdit);
-		savePeerButton = findViewById(R.id.savePeerButton);
+		ownersList = findViewById(R.id.ownersList);
 		appVersion = findViewById(R.id.appVersion);
 		updateButton = findViewById(R.id.updateButton);
 
@@ -154,9 +155,6 @@ public class UsbIpConfig extends ComponentActivity {
 				updateUi();
 			}
 		});
-
-		// Load the saved peer invite into the edit field.
-		peerInviteEdit.setText(relayController.getPeerInvite());
 
 		// Generate (or load) this device's invite off the UI thread, then show it.
 		myInvite.setText("(generating...)");
@@ -192,25 +190,6 @@ public class UsbIpConfig extends ComponentActivity {
 			}
 		});
 
-		savePeerButton.setOnClickListener(new OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				String invite = peerInviteEdit.getText().toString().trim();
-				if (invite.isEmpty() || invite.startsWith("K0")) {
-					relayController.setPeerInvite(invite);
-					Toast.makeText(UsbIpConfig.this,
-							invite.isEmpty() ? "Peer invite cleared" : "Peer invite saved",
-							Toast.LENGTH_SHORT).show();
-					// Saving a peer invite may now satisfy the auto-raise condition.
-					refreshUsbAndMaybeRaise();
-				} else {
-					Toast.makeText(UsbIpConfig.this,
-							"That does not look like an invite (should start with K0)",
-							Toast.LENGTH_LONG).show();
-				}
-			}
-		});
-
 		// App section: show the installed version and offer an in-app self-update.
 		int versionCode = Updater.getInstalledVersionCode(this);
 		String versionName = Updater.getInstalledVersionName(this);
@@ -242,8 +221,12 @@ public class UsbIpConfig extends ComponentActivity {
 		// Pick up the current service state (it may have been stopped externally).
 		serviceRunning = isMyServiceRunning(UsbIpService.class);
 
+		// Reload the owners list each time the screen becomes visible; a new owner
+		// may have been recorded by usbws since we were last shown.
+		refreshOwners();
+
 		// On launch (including being launched by USB_DEVICE_ATTACHED), raise the
-		// bridge if a device is already plugged in and a peer invite is set.
+		// bridge if a device is already plugged in (accept mode needs no peer).
 		refreshUsbAndMaybeRaise();
 	}
 
@@ -287,17 +270,15 @@ public class UsbIpConfig extends ComponentActivity {
 	}
 
 	/**
-	 * Core auto-flow: if a device is attached AND a peer invite is set, start the
-	 * USB/IP service and the relay with no confirmation. Does nothing if either
-	 * condition is missing or if the relay is already up.
+	 * Core auto-flow: if a USB device is attached, start the USB/IP service and the
+	 * relay (accept-incoming mode) with no confirmation. No peer is required — the
+	 * first remote computer that connects with our invite becomes the owner. Does
+	 * nothing if no device is present or if the relay is already up.
 	 */
 	private void maybeAutoRaise() {
 		UsbDevice dev = firstSharableDevice();
 		if (dev == null) {
 			return; // No device — nothing to share.
-		}
-		if (relayController.getPeerInvite().isEmpty()) {
-			return; // No peer — show the hint instead (handled in updateUi()).
 		}
 		if (relayController.isRunning()
 				|| relayController.getState() == RelayController.State.CONNECTING) {
@@ -315,7 +296,7 @@ public class UsbIpConfig extends ComponentActivity {
 		}
 
 		startServiceNow();
-		startRelayIfConfigured();
+		startRelayNow();
 	}
 
 	private void startServiceNow() {
@@ -325,10 +306,8 @@ public class UsbIpConfig extends ComponentActivity {
 		}
 	}
 
-	private void startRelayIfConfigured() {
-		if (relayController.getPeerInvite().isEmpty()) {
-			return;
-		}
+	/** Starts the relay in accept-incoming mode unless it is already up. */
+	private void startRelayNow() {
 		if (!relayController.isRunning()
 				&& relayController.getState() != RelayController.State.CONNECTING) {
 			relayController.start();
@@ -411,12 +390,13 @@ public class UsbIpConfig extends ComponentActivity {
 			// No device attached.
 			combinedStatus.setText(R.string.status_idle_no_device);
 			combinedStatus.setTextColor(ContextCompat.getColor(this, R.color.status_idle));
-		} else if (relayController.getPeerInvite().isEmpty()) {
-			// Device present but no peer invite: clear actionable hint.
-			combinedStatus.setText(R.string.status_need_peer);
+		} else if (!relayActive) {
+			// Device present but the relay is not up yet (e.g. permission pending):
+			// it will be raised automatically, so show a waiting hint.
+			combinedStatus.setText(R.string.status_waiting_owner);
 			combinedStatus.setTextColor(ContextCompat.getColor(this, R.color.status_warn));
 		} else {
-			// Device + peer: report the live relay state inline.
+			// Device + active relay: report the live relay state inline.
 			String relayWord;
 			int color;
 			switch (relayState) {
@@ -447,6 +427,33 @@ public class UsbIpConfig extends ComponentActivity {
 		// Stop button is a manual override: only shown while something is active.
 		boolean active = relayActive || serviceRunning;
 		stopSharingButton.setVisibility(active ? View.VISIBLE : View.GONE);
+	}
+
+	/**
+	 * Reloads the OWNERS list from the usbws authorized table. Shows a friendly
+	 * "no owners yet" line when the table is empty/missing (TOFU still active),
+	 * otherwise one "shortKey  nick" line per authorized owner.
+	 */
+	private void refreshOwners() {
+		List<RelayController.Owner> owners = relayController.getOwners();
+		if (owners.isEmpty()) {
+			ownersList.setText(R.string.owners_none);
+			ownersList.setTextColor(ContextCompat.getColor(this, R.color.helper_text));
+			return;
+		}
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < owners.size(); i++) {
+			if (i > 0) {
+				sb.append('\n');
+			}
+			RelayController.Owner o = owners.get(i);
+			sb.append(o.shortKey());
+			if (o.nick != null && !o.nick.isEmpty()) {
+				sb.append("  ").append(o.nick);
+			}
+		}
+		ownersList.setText(sb.toString());
+		ownersList.setTextColor(ContextCompat.getColor(this, R.color.status_ok));
 	}
 
 	// Elegant Stack Overflow solution to querying running services.

@@ -92,23 +92,91 @@ public class RelayController {
         return process != null;
     }
 
-    /** Returns the saved peer invite, or an empty string if none is set. */
-    public String getPeerInvite() {
-        SharedPreferences prefs =
-                appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        return prefs.getString(PREF_PEER_INVITE, "");
+    /** One authorized owner parsed from the authorized table. */
+    public static final class Owner {
+        /** Full x_pub hex (64 chars). */
+        public final String xPubHex;
+        /** Optional nick (may be empty). */
+        public final String nick;
+
+        Owner(String xPubHex, String nick) {
+            this.xPubHex = xPubHex;
+            this.nick = nick;
+        }
+
+        /** First 8 + last 4 hex chars, for a compact UI line. */
+        public String shortKey() {
+            if (xPubHex.length() <= 12) {
+                return xPubHex;
+            }
+            return xPubHex.substring(0, 8) + "…" + xPubHex.substring(xPubHex.length() - 4);
+        }
     }
 
-    /** Persists the peer invite to connect to. */
-    public void setPeerInvite(String invite) {
-        SharedPreferences prefs =
-                appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        prefs.edit().putString(PREF_PEER_INVITE, invite == null ? "" : invite.trim()).apply();
+    /**
+     * Reads the authorized-owners table written by usbws. Returns the parsed
+     * owners (possibly empty) — an empty/missing file means trust-on-first-use
+     * is still active and no owner has connected yet.
+     */
+    public List<Owner> getOwners() {
+        List<Owner> owners = new ArrayList<>();
+        File file = authorizedFile();
+        if (!file.exists()) {
+            return owners;
+        }
+        BufferedReader br = null;
+        try {
+            br = new BufferedReader(new FileReader(file));
+            String line;
+            while ((line = br.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("#")) {
+                    continue;
+                }
+                // "<hex64> [nick...]" — split off the first whitespace-delimited token.
+                int sp = indexOfWhitespace(line);
+                String hex;
+                String nick;
+                if (sp < 0) {
+                    hex = line;
+                    nick = "";
+                } else {
+                    hex = line.substring(0, sp);
+                    nick = line.substring(sp).trim();
+                }
+                owners.add(new Owner(hex, nick));
+            }
+        } catch (IOException e) {
+            Log.w(TAG, "failed to read authorized table", e);
+        } finally {
+            if (br != null) {
+                try {
+                    br.close();
+                } catch (IOException ignored) {
+                }
+            }
+        }
+        return owners;
+    }
+
+    /** Index of the first whitespace char in s, or -1 if none. */
+    private static int indexOfWhitespace(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            if (Character.isWhitespace(s.charAt(i))) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /** Absolute path to the per-device identity file in filesDir. */
     private File identityFile() {
         return new File(appContext.getFilesDir(), IDENTITY_FILE);
+    }
+
+    /** Absolute path to the authorized-owners table in filesDir. */
+    private File authorizedFile() {
+        return new File(appContext.getFilesDir(), AUTHORIZED_FILE);
     }
 
     private String binaryPath() {
@@ -177,21 +245,17 @@ public class RelayController {
     }
 
     /**
-     * Starts the relay process. Returns immediately; actual startup happens on a
-     * background thread and is reported via the StateListener.
+     * Starts the relay process in accept-incoming (capability) mode. Returns
+     * immediately; actual startup happens on a background thread and is reported
+     * via the StateListener.
      *
-     * Does nothing (logs and reports ERROR) if no peer invite is configured.
+     * No peer invite is needed: the gate listens on its own identity and accepts
+     * the first remote that connects knowing this device's invite (then only the
+     * remembered owners, per the authorized table).
      */
     public synchronized void start() {
         if (process != null) {
             // Already running.
-            return;
-        }
-
-        final String peerInvite = getPeerInvite();
-        if (peerInvite == null || peerInvite.isEmpty()) {
-            Log.w(TAG, "cannot start relay: peer invite not set");
-            setState(State.ERROR);
             return;
         }
 
@@ -200,7 +264,7 @@ public class RelayController {
         Thread starter = new Thread(new Runnable() {
             @Override
             public void run() {
-                startInternal(peerInvite);
+                startInternal();
             }
         }, "usbws-starter");
         starter.start();
@@ -240,22 +304,25 @@ public class RelayController {
         setState(State.OFF);
     }
 
-    private void startInternal(String peerInvite) {
+    private void startInternal() {
         try {
             File identity = identityFile();
             String binaryPath = binaryPath();
 
+            // Accept-incoming (capability) mode: no fixed --peer. The gate waits
+            // for an initiator who knows our invite; the authorized table (next to
+            // the identity in filesDir) gates who is allowed (TOFU when empty).
             ProcessBuilder pb = new ProcessBuilder(
                     binaryPath,
                     "tcp-connect",
                     LOCAL_ENDPOINT,
-                    "--peer", peerInvite);
+                    "--accept");
             // usbws load-or-creates this identity, so it exists after the first run.
             pb.environment().put("USBWS_IDENTITY", identity.getAbsolutePath());
             pb.redirectErrorStream(true);
 
             Log.i(TAG, "starting relay: " + binaryPath + " tcp-connect "
-                    + LOCAL_ENDPOINT + " (identity=" + identity.getAbsolutePath() + ")");
+                    + LOCAL_ENDPOINT + " --accept (identity=" + identity.getAbsolutePath() + ")");
 
             Process p = pb.start();
 

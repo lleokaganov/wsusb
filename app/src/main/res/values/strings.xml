@@ -10,26 +10,25 @@
     <!-- Section headings -->
     <string name="section_device">DEVICE</string>
     <string name="section_your_invite">YOUR INVITE</string>
-    <string name="section_peer">PEER</string>
+    <string name="section_owners">OWNERS</string>
     <string name="section_app">APP</string>
 
     <!-- Device / status section -->
-    <string name="device_section_hint">Plug a device into the phone via OTG. When a device is present and a peer invite is set, sharing starts automatically.</string>
+    <string name="device_section_hint">Plug a device into the phone via OTG. When a device is present, sharing starts automatically. The first computer that connects with your invite becomes its owner.</string>
     <string name="usb_none">USB device: none — plug one in via OTG</string>
     <string name="stop_sharing">Stop sharing</string>
 
     <!-- Combined status lines -->
     <string name="status_idle_no_device">Idle — plug in a device</string>
-    <string name="status_need_peer">Device ready — set the peer invite below to share automatically</string>
+    <string name="status_waiting_owner">Waiting for a computer to connect with your invite…</string>
 
     <!-- Your invite section -->
-    <string name="your_invite_hint">Copy this and give it to the remote side so they can reach you.</string>
+    <string name="your_invite_hint">Copy this and give it to the remote computer so it can reach you and become an owner.</string>
     <string name="copy">Copy</string>
 
-    <!-- Peer section -->
-    <string name="peer_hint">Paste the invite from the remote side, then save it.</string>
-    <string name="peer_invite_field_hint">Paste the remote side\'s invite (K0…)</string>
-    <string name="save">Save</string>
+    <!-- Owners section -->
+    <string name="owners_hint">Computers authorized to use this shared device.</string>
+    <string name="owners_none">No owners yet — first computer that connects with your invite becomes the owner.</string>
 
     <!-- Relay status wording (used inside the combined status line) -->
     <string name="relay_off">relay not connected</string>
