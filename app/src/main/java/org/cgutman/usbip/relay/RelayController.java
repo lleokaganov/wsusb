@@ -1,13 +1,15 @@
 package org.cgutman.usbip.relay;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.util.Log;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Drives the bundled usbws native binary (libusbws.so) to bridge the local
@@ -17,14 +19,21 @@ import java.io.InputStreamReader;
  * nativeLibraryDir at install time (extractNativeLibs=true), which is the only
  * place from which Android allows executing a process.
  *
- * START spawns:  libusbws.so tcp-connect 127.0.0.1:3240 --peer <peerInvite>
+ * START spawns:  libusbws.so tcp-connect 127.0.0.1:3240 --accept
  * with env USBWS_IDENTITY pointing at a per-device identity file in filesDir.
+ *
+ * Capability / accept-incoming mode: the gate no longer needs a fixed peer. It
+ * listens on its own invite and accepts whoever connects knowing it, learning
+ * the initiator's key from the handshake. The first remote to connect (when the
+ * authorized table is empty) is trusted-on-first-use and remembered as an owner;
+ * afterwards only listed owners are accepted. The authorized table is a plain
+ * file named "authorized" living alongside the identity file (filesDir), one
+ * "&lt;x_pub_hex64&gt; [nick]" per line.
  *
  * Identity is unique per install: usbws performs load-or-create on the path in
  * USBWS_IDENTITY, so the keypair is generated on this device the first time
  * keygen (or tcp-connect) runs, and persists across restarts. The invite to
- * hand to the remote side is produced by {@link #generateInvite()}; the peer
- * invite to connect to is stored in SharedPreferences by the settings screen.
+ * hand to the remote side is produced by {@link #generateInvite()}.
  */
 public class RelayController {
     private static final String TAG = "wsusb";
@@ -37,9 +46,10 @@ public class RelayController {
     // is unique to this install and never bundled in the APK.
     private static final String IDENTITY_FILE = "usbws_identity";
 
-    // SharedPreferences storage for the relay configuration.
-    public static final String PREFS_NAME = "relay_prefs";
-    public static final String PREF_PEER_INVITE = "peer_invite";
+    // Authorized-owners table written by usbws (capability list). It lives in the
+    // same directory as the identity file (filesDir) and is named "authorized";
+    // one "<x_pub_hex64> [nick]" per line. Empty/missing => trust-on-first-use.
+    private static final String AUTHORIZED_FILE = "authorized";
 
     // Local TCP endpoint of the USB/IP server (UsbIpServer.PORT == 3240).
     private static final String LOCAL_ENDPOINT = "127.0.0.1:3240";
