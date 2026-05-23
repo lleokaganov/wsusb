@@ -6,6 +6,7 @@
     <color name="helper_text">#B0B0B0</color>       <!-- muted grey for helper captions -->
     <color name="status_ok">#81C784</color>         <!-- green for running / connected -->
     <color name="status_idle">#BDBDBD</color>       <!-- grey for stopped / off -->
+    <color name="status_warn">#FFB74D</color>       <!-- amber for "action needed" hints -->
     <color name="readonly_field_bg">#1FFFFFFF</color> <!-- faint fill to mark read-only invite -->
     <color name="tagline">#9E9E9E</color>           <!-- muted grey for the tagline -->
 </resources>

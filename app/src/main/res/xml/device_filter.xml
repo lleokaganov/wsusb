@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Device filter for android.hardware.usb.action.USB_DEVICE_ATTACHED.
+
+  Each <usb-device> matches a vendor by its decimal vendor-id. When one of these
+  devices is plugged in via OTG, Android offers to "always open wsusb for this
+  device", and once accepted, auto-launches the app on every future plug-in.
+
+  vendor-id values are DECIMAL (Android requires decimal here). The hex VID each
+  one corresponds to is noted in the comment so it stays easy to audit/extend.
+-->
+<resources>
+    <usb-device vendor-id="6790" />   <!-- 0x1a86  QinHeng / CH340, CH341, CH9102 USB-serial -->
+    <usb-device vendor-id="1155" />   <!-- 0x0483  STMicroelectronics / ST-Link, virtual COM -->
+    <usb-device vendor-id="4292" />   <!-- 0x10c4  Silicon Labs / CP210x USB-serial -->
+    <usb-device vendor-id="1027" />   <!-- 0x0403  FTDI / FT232, FT2232 USB-serial -->
+    <usb-device vendor-id="1659" />   <!-- 0x067b  Prolific / PL2303 USB-serial -->
+    <usb-device vendor-id="9025" />   <!-- 0x2341  Arduino -->
+    <usb-device vendor-id="12346" />  <!-- 0x303a  Espressif / ESP32-S2/S3/C3 native USB -->
+    <usb-device vendor-id="4966" />   <!-- 0x1366  SEGGER / J-Link -->
+    <usb-device vendor-id="5824" />   <!-- 0x16c0  Van Ooijen Technische Informatica / Teensy, USB CDC -->
+    <usb-device vendor-id="9114" />   <!-- 0x239a  Adafruit -->
+</resources>

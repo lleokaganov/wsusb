@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    android:versionCode="3"
+    android:versionCode="4"
     android:versionName="0.1" >
     
     <uses-feature android:name="android.hardware.usb.host" android:required="true" />
@@ -37,6 +37,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Device-filter capture: when a USB device whose vendor matches
+                 res/xml/device_filter.xml is attached, Android offers to always
+                 open wsusb for it, then auto-launches this activity on plug-in. -->
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/device_filter" />
         </activity>
 
         <!-- Exposes the downloaded update APK to the system installer via content:// Uri. -->

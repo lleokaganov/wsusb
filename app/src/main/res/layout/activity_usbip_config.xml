@@ -29,7 +29,64 @@
             android:textSize="14sp" />
 
         <!-- =============================================================
-             SECTION 1 — YOUR INVITE (copy, give to peer)
+             SECTION — DEVICE (live USB status + combined sharing status)
+             Sharing is raised automatically when a device is attached AND a
+             peer invite is set; the button is a manual override only.
+             ============================================================= -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:letterSpacing="0.08"
+            android:text="@string/section_device"
+            android:textColor="@color/section_heading"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="12dp"
+            android:background="@color/separator" />
+
+        <!-- Live USB device line (none / technical info, updated by the receiver). -->
+        <TextView
+            android:id="@+id/usbDeviceInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/usb_none"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:typeface="monospace" />
+
+        <!-- Combined sharing status: e.g. "Sharing: CH340 1a86:7523 → relay connected". -->
+        <TextView
+            android:id="@+id/combinedStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/device_section_hint"
+            android:textColor="@color/helper_text"
+            android:textSize="13sp" />
+
+        <!-- Manual override: only enabled/visible while something is being shared. -->
+        <Button
+            android:id="@+id/stopSharingButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/stop_sharing" />
+
+        <!-- =============================================================
+             SECTION — YOUR INVITE (copy, give to peer)
              ============================================================= -->
         <TextView
             android:layout_width="match_parent"
@@ -86,7 +143,7 @@
         </LinearLayout>
 
         <!-- =============================================================
-             SECTION 2 — PEER (paste, save)
+             SECTION — PEER (paste, save)
              ============================================================= -->
         <TextView
             android:layout_width="match_parent"
@@ -130,83 +187,7 @@
             android:text="@string/save" />
 
         <!-- =============================================================
-             SECTION 3 — CONTROLS (step 1 then step 2, in usage order)
-             ============================================================= -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            android:letterSpacing="0.08"
-            android:text="@string/section_controls"
-            android:textColor="@color/section_heading"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="12dp"
-            android:background="@color/separator" />
-
-        <!-- Step 1: start the on-phone USB/IP server (cgutman's serviceButton). -->
-        <Button
-            android:id="@+id/serviceButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/step1_button" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/step1_helper"
-            android:textColor="@color/helper_text"
-            android:textSize="13sp" />
-
-        <TextView
-            android:id="@+id/serviceStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <!-- Extra hint shown once the USB server is running. -->
-        <TextView
-            android:id="@+id/serviceReadyText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:textColor="@color/helper_text"
-            android:textSize="13sp" />
-
-        <!-- Step 2: open the encrypted relay tunnel (relay_toggle). -->
-        <Button
-            android:id="@+id/relay_toggle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="22dp"
-            android:text="@string/step2_button" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/step2_helper"
-            android:textColor="@color/helper_text"
-            android:textSize="13sp" />
-
-        <TextView
-            android:id="@+id/relayStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <!-- =============================================================
-             SECTION 4 — APP (version + self-update)
+             SECTION — APP (version + self-update)
              ============================================================= -->
         <TextView
             android:layout_width="match_parent"

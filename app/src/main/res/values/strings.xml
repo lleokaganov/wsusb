@@ -3,17 +3,24 @@
     <string name="app_name">USB/IP Server</string>
     <string name="service_name">USB/IP Server Service</string>
 
-    <string name="ready_text">Claim a USB device from your USB/IP client to get started!</string>
-
     <!-- Title / tagline -->
     <string name="app_title">wsusb</string>
     <string name="app_tagline">Share a phone-connected USB device with a remote computer.</string>
 
     <!-- Section headings -->
+    <string name="section_device">DEVICE</string>
     <string name="section_your_invite">YOUR INVITE</string>
     <string name="section_peer">PEER</string>
-    <string name="section_controls">CONTROLS</string>
     <string name="section_app">APP</string>
+
+    <!-- Device / status section -->
+    <string name="device_section_hint">Plug a device into the phone via OTG. When a device is present and a peer invite is set, sharing starts automatically.</string>
+    <string name="usb_none">USB device: none — plug one in via OTG</string>
+    <string name="stop_sharing">Stop sharing</string>
+
+    <!-- Combined status lines -->
+    <string name="status_idle_no_device">Idle — plug in a device</string>
+    <string name="status_need_peer">Device ready — set the peer invite below to share automatically</string>
 
     <!-- Your invite section -->
     <string name="your_invite_hint">Copy this and give it to the remote side so they can reach you.</string>
@@ -24,23 +31,11 @@
     <string name="peer_invite_field_hint">Paste the remote side\'s invite (K0…)</string>
     <string name="save">Save</string>
 
-    <!-- Controls: step 1 -->
-    <string name="step1_button">1. Start USB server</string>
-    <string name="step1_button_stop">Stop USB server</string>
-    <string name="step1_helper">Exposes the USB device plugged into this phone.</string>
-
-    <!-- Controls: step 2 -->
-    <string name="step2_button">2. Connect relay</string>
-    <string name="step2_button_stop">Disconnect relay</string>
-    <string name="step2_helper">Tunnels the USB device to the remote computer over the encrypted relay.</string>
-
-    <!-- Status wording -->
-    <string name="usb_server_running">USB server: running</string>
-    <string name="usb_server_stopped">USB server: stopped</string>
-    <string name="relay_off">Relay: not connected</string>
-    <string name="relay_connecting">Relay: connecting…</string>
-    <string name="relay_connected">Relay: connected</string>
-    <string name="relay_error">Relay: error (see logcat tag wsusb)</string>
+    <!-- Relay status wording (used inside the combined status line) -->
+    <string name="relay_off">relay not connected</string>
+    <string name="relay_connecting">relay connecting…</string>
+    <string name="relay_connected">relay connected</string>
+    <string name="relay_error">relay error (see logcat tag wsusb)</string>
 
     <!-- App / self-update section -->
     <string name="app_version_label">Version</string>
