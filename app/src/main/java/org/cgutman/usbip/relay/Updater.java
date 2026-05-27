@@ -49,10 +49,10 @@ public class Updater {
     // Stable public host with static IP — lleo.me/apk/<app>/. Never point at
     // qlleo.lleo.me (dev box, dynamic IP) or raw IPs.
     private static final String VERSION_URL = "https://lleo.me/apk/wsusb/version.txt";
-    private static final String APK_URL = "https://lleo.me/apk/wsusb/wsusb-latest.apk";
+    private static final String APK_URL = "https://lleo.me/apk/wsusb/lleo.wsusb.apk";
 
     // Local filename for the downloaded APK (kept stable so we overwrite, not pile up).
-    private static final String APK_FILE_NAME = "wsusb-latest.apk";
+    private static final String APK_FILE_NAME = "lleo.wsusb.apk";
 
     private static final int HTTP_TIMEOUT_MS = 15000;
 
