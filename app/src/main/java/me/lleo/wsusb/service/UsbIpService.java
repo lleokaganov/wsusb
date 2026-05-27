@@ -466,7 +466,14 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 					int res;
 					int retries = 0;
 					do {
-						res = XferUtils.doBulkTransfer(context.devConn, selectedEndpoint, buff.array(), 1000);
+						// UsbDeviceConnection.bulkTransfer() is NOT thread-safe per
+						// endpoint — two concurrent calls on the same endpoint cause
+						// one to fail with -108 (ESHUTDOWN), which we then propagate
+						// as an error and kernel tears the device down. Serialize
+						// per-endpoint to keep the chip happy under load.
+						synchronized (selectedEndpoint) {
+							res = XferUtils.doBulkTransfer(context.devConn, selectedEndpoint, buff.array(), 1000);
+						}
 						retries++;
 						if (retries == 1 || retries % 5 == 0) {
 							android.util.Log.i("wsusb", "Bulk try=" + retries + " res=" + res
