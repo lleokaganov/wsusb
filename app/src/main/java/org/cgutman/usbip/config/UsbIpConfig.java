@@ -482,13 +482,14 @@ public class UsbIpConfig extends ComponentActivity {
 	}
 
 	/**
-	 * Sensory feedback when a USB device is attached: one short DTMF blip
-	 * (~120ms) and a short vibration buzz (~40ms). Intentionally minimal so
-	 * the phone can sit in a pocket and still confirm the event.
+	 * Sensory feedback when a USB device is attached: one clear ringing blip
+	 * + short vibration buzz. Loud-on-purpose (max volume, ringer stream so
+	 * it bypasses the media slider) so the phone can sit in a pocket and
+	 * still confirm the event audibly.
 	 */
 	private void feedbackAttach() {
-		playTone(ToneGenerator.TONE_PROP_BEEP, 120);
-		vibrate(40);
+		playTone(ToneGenerator.TONE_DTMF_5, 200);
+		vibrate(80);
 	}
 
 	/**
@@ -497,15 +498,19 @@ public class UsbIpConfig extends ComponentActivity {
 	 * user having to think about which one just happened.
 	 */
 	private void feedbackDetach() {
-		playTone(ToneGenerator.TONE_PROP_BEEP2, 90);
-		vibratePattern(new long[]{0, 40, 60, 40});
+		playTone(ToneGenerator.TONE_DTMF_1, 150);
+		new android.os.Handler(getMainLooper()).postDelayed(new Runnable() {
+			@Override public void run() { playTone(ToneGenerator.TONE_DTMF_1, 150); }
+		}, 220);
+		vibratePattern(new long[]{0, 80, 100, 80});
 	}
 
 	private void playTone(int toneType, int durationMs) {
 		try {
-			// Notification stream so the user's media volume isn't bothered.
-			// 80/100 volume is audible without being startling.
-			final ToneGenerator tg = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80);
+			// Ringer stream + max volume so the blip is loud enough to hear
+			// from a pocket. Ringer is not silenced by media volume, only by
+			// the phone's mute switch.
+			final ToneGenerator tg = new ToneGenerator(AudioManager.STREAM_RING, 100);
 			tg.startTone(toneType, durationMs);
 			// Tone runs async; release the generator slightly after the tone ends.
 			new android.os.Handler(getMainLooper()).postDelayed(new Runnable() {
