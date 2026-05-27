@@ -181,6 +181,15 @@
             android:textSize="13sp"
             android:typeface="monospace" />
 
+        <!-- Visible only when the authorized table is non-empty (see refreshOwners). -->
+        <Button
+            android:id="@+id/forgetOwnersButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/forget_owners"
+            android:visibility="gone" />
+
         <!-- =============================================================
              SECTION — APP (version + self-update)
              ============================================================= -->

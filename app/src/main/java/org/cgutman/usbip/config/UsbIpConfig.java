@@ -27,6 +27,8 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -63,6 +65,7 @@ public class UsbIpConfig extends ComponentActivity {
 
 	// OWNERS section.
 	private TextView ownersList;
+	private Button forgetOwnersButton;
 
 	// APP section.
 	private TextView appVersion;
@@ -129,6 +132,7 @@ public class UsbIpConfig extends ComponentActivity {
 		myInvite = findViewById(R.id.myInvite);
 		copyInviteButton = findViewById(R.id.copyInviteButton);
 		ownersList = findViewById(R.id.ownersList);
+		forgetOwnersButton = findViewById(R.id.forgetOwnersButton);
 		appVersion = findViewById(R.id.appVersion);
 		updateButton = findViewById(R.id.updateButton);
 
@@ -172,6 +176,27 @@ public class UsbIpConfig extends ComponentActivity {
 				});
 			}
 		}, "usbws-keygen").start();
+
+		forgetOwnersButton.setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				new AlertDialog.Builder(UsbIpConfig.this)
+						.setTitle(R.string.forget_owners_confirm_title)
+						.setMessage(R.string.forget_owners_confirm_message)
+						.setPositiveButton(R.string.forget_owners, new DialogInterface.OnClickListener() {
+							@Override
+							public void onClick(DialogInterface dialog, int which) {
+								boolean ok = relayController.clearAuthorized();
+								Toast.makeText(UsbIpConfig.this,
+										ok ? R.string.forget_owners_done : R.string.forget_owners_failed,
+										Toast.LENGTH_LONG).show();
+								refreshOwners();
+							}
+						})
+						.setNegativeButton(R.string.cancel, null)
+						.show();
+			}
+		});
 
 		copyInviteButton.setOnClickListener(new OnClickListener() {
 			@Override
@@ -439,6 +464,7 @@ public class UsbIpConfig extends ComponentActivity {
 		if (owners.isEmpty()) {
 			ownersList.setText(R.string.owners_none);
 			ownersList.setTextColor(ContextCompat.getColor(this, R.color.helper_text));
+			forgetOwnersButton.setVisibility(View.GONE);
 			return;
 		}
 		StringBuilder sb = new StringBuilder();
@@ -454,6 +480,7 @@ public class UsbIpConfig extends ComponentActivity {
 		}
 		ownersList.setText(sb.toString());
 		ownersList.setTextColor(ContextCompat.getColor(this, R.color.status_ok));
+		forgetOwnersButton.setVisibility(View.VISIBLE);
 	}
 
 	// Elegant Stack Overflow solution to querying running services.

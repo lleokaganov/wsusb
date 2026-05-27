@@ -29,6 +29,12 @@
     <!-- Owners section -->
     <string name="owners_hint">Computers authorized to use this shared device.</string>
     <string name="owners_none">No owners yet — first computer that connects with your invite becomes the owner.</string>
+    <string name="forget_owners">Forget owners</string>
+    <string name="forget_owners_confirm_title">Forget all owners?</string>
+    <string name="forget_owners_confirm_message">The next computer that connects with your invite will become the new owner (TOFU). Use this if a previous owner rotated keys and now silently fails to connect.</string>
+    <string name="forget_owners_done">Owners cleared — next connection will be trusted</string>
+    <string name="forget_owners_failed">Could not clear owners — see logcat tag wsusb</string>
+    <string name="cancel">Cancel</string>
 
     <!-- Relay status wording (used inside the combined status line) -->
     <string name="relay_off">relay not connected</string>

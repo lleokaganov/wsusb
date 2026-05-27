@@ -159,6 +159,24 @@ public class RelayController {
         return owners;
     }
 
+    /**
+     * Deletes the authorized-owners table so TOFU re-arms on the next connect.
+     * Use when a previously-trusted owner has rotated keys (e.g. their identity
+     * file was regenerated) and the gate now silently refuses them. Returns true
+     * if the file was deleted or did not exist; false on a real I/O failure.
+     */
+    public boolean clearAuthorized() {
+        File file = authorizedFile();
+        if (!file.exists()) {
+            return true;
+        }
+        boolean ok = file.delete();
+        if (!ok) {
+            Log.w(TAG, "failed to delete authorized table at " + file.getAbsolutePath());
+        }
+        return ok;
+    }
+
     /** Index of the first whitespace char in s, or -1 if none. */
     private static int indexOfWhitespace(String s) {
         for (int i = 0; i < s.length(); i++) {
