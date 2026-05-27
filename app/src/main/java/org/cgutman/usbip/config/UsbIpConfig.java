@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import org.cgutman.usbip.WsusbApp;
 import org.cgutman.usbip.relay.RelayController;
 import org.cgutman.usbip.relay.Updater;
 import org.cgutman.usbip.service.UsbIpService;
@@ -158,8 +159,11 @@ public class UsbIpConfig extends ComponentActivity {
 
 		serviceRunning = isMyServiceRunning(UsbIpService.class);
 
-		// Relay controller drives the encrypted tunnel and reports state changes.
-		relayController = new RelayController(this);
+		// Relay controller is an Application-scoped singleton: surviving Activity
+		// recreate (rotation, restore from background) keeps the libusbws child
+		// process unique — multiple instances would all fight for one relay
+		// identity and fail handshakes.
+		relayController = ((WsusbApp) getApplication()).getRelayController();
 		relayController.setStateListener(new RelayController.StateListener() {
 			@Override
 			public void onRelayState(RelayController.State state) {
