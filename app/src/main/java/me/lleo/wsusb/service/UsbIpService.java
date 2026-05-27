@@ -752,12 +752,28 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 		if (devConn == null) {
 			return false;
 		}
-		
+
+		// CRITICAL: claim every interface with force=true so that any kernel
+		// driver already bound to the device (e.g. cdc-acm for our STM32 CDC,
+		// or usb-storage for mass storage) is detached and ownership transfers
+		// to us. Without this, UsbDeviceConnection.bulkTransfer() returns -108
+		// (ESHUTDOWN) shortly after attach — bytes appear to go through for a
+		// moment, then the kernel driver reclaims the endpoints and our
+		// transfers fail. This was the root cause of attach-then-die for
+		// CDC ACM and USB-serial devices on this gateway.
+		for (int i = 0; i < dev.getInterfaceCount(); i++) {
+			android.hardware.usb.UsbInterface iface = dev.getInterface(i);
+			boolean ok = devConn.claimInterface(iface, true);
+			android.util.Log.i("wsusb", "claimInterface " + i
+					+ " (class=" + iface.getInterfaceClass()
+					+ ", endpoints=" + iface.getEndpointCount() + ") = " + ok);
+		}
+
 		// Create a context for this attachment
 		AttachedDeviceContext context = new AttachedDeviceContext();
 		context.devConn = devConn;
 		context.device = dev;
-		
+
 		// Count all endpoints on all interfaces
 		int endpointCount = 0;
 		for (int i = 0; i < dev.getInterfaceCount(); i++) {
