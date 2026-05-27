@@ -284,6 +284,38 @@ public class UsbIpConfig extends ComponentActivity {
 		// On launch (including being launched by USB_DEVICE_ATTACHED), raise the
 		// bridge if a device is already plugged in (accept mode needs no peer).
 		refreshUsbAndMaybeRaise();
+
+		// Force a USB permission dialog for every attached device we don't yet
+		// own. Without this, after a package reinstall Android no longer pops
+		// the "Allow access" dialog automatically — even though our intent-
+		// filter + device_filter.xml are correct — and UsbIpService gets stuck
+		// inside attachToDevice() forever waiting on permission. Calling
+		// requestPermission() explicitly here forces the dialog every time the
+		// user opens the app, so they can grant and we can proceed.
+		ensureUsbPermission();
+	}
+
+	/** PendingIntent used to receive USB permission grant results. */
+	private android.app.PendingIntent permissionPendingIntent() {
+		Intent i = new Intent("me.lleo.wsusb.USB_PERMISSION");
+		i.setPackage(getPackageName());
+		int flags = android.app.PendingIntent.FLAG_UPDATE_CURRENT;
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+			flags |= android.app.PendingIntent.FLAG_MUTABLE;
+		}
+		return android.app.PendingIntent.getBroadcast(this, 0, i, flags);
+	}
+
+	/** For each non-hub attached USB device that we don't have permission for,
+	 *  call requestPermission() so Android shows the grant dialog. */
+	private void ensureUsbPermission() {
+		android.app.PendingIntent pi = permissionPendingIntent();
+		for (UsbDevice dev : usbManager.getDeviceList().values()) {
+			if (dev.getDeviceClass() == UsbConstants.USB_CLASS_HUB) continue;
+			if (!usbManager.hasPermission(dev)) {
+				usbManager.requestPermission(dev, pi);
+			}
+		}
 	}
 
 	@Override
