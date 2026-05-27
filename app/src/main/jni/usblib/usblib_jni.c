@@ -7,7 +7,7 @@
 #include <sys/ioctl.h>
 
 JNIEXPORT jint JNICALL
-Java_org_cgutman_usbip_jni_UsbLib_doBulkTransfer(
+Java_me_lleo_wsusb_jni_UsbLib_doBulkTransfer(
         JNIEnv *env, jclass clazz, jint fd, jint endpoint, jbyteArray data, jint timeout)
 {
     jbyte* dataPtr = data ? (jbyte*)(*env)->GetPrimitiveArrayCritical(env, data, NULL) : NULL;
@@ -34,7 +34,7 @@ Java_org_cgutman_usbip_jni_UsbLib_doBulkTransfer(
 };
 
 JNIEXPORT jint JNICALL
-Java_org_cgutman_usbip_jni_UsbLib_doControlTransfer(
+Java_me_lleo_wsusb_jni_UsbLib_doControlTransfer(
         JNIEnv *env, jclass clazz, jint fd, jbyte requestType, jbyte request, jshort value,
         jshort index, jbyteArray data, jint length, jint timeout)
 {
