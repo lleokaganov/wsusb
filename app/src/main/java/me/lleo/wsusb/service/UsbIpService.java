@@ -458,31 +458,34 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 				}
 				
 				if (selectedEndpoint.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK) {
-					if (DEBUG) {
-						System.out.printf("Bulk transfer - %d bytes %s on EP %d\n",
-								buff.array().length, msg.direction == UsbIpDevicePacket.USBIP_DIR_IN ? "in" : "out",
-										selectedEndpoint.getEndpointNumber());
-					}
-					
+					android.util.Log.i("wsusb", "Bulk START "
+							+ buff.array().length + " bytes "
+							+ (msg.direction == UsbIpDevicePacket.USBIP_DIR_IN ? "in" : "out")
+							+ " EP " + selectedEndpoint.getEndpointNumber());
+
 					int res;
+					int retries = 0;
 					do {
 						res = XferUtils.doBulkTransfer(context.devConn, selectedEndpoint, buff.array(), 1000);
-						
+						retries++;
+						if (retries == 1 || retries % 5 == 0) {
+							android.util.Log.i("wsusb", "Bulk try=" + retries + " res=" + res
+									+ " EP " + selectedEndpoint.getEndpointNumber()
+									+ " " + (msg.direction == UsbIpDevicePacket.USBIP_DIR_IN ? "in" : "out"));
+						}
+
 						if (context.requestPool.isShutdown()) {
 							// Bail if the queue is being torn down
 							return;
 						}
-						
+
 						if (!context.activeMessages.contains(msg)) {
 							// Somebody cancelled the URB, return without responding
 							return;
 						}
 					} while (res == -110); // ETIMEDOUT
-					
-					if (DEBUG) {
-						System.out.printf("Bulk transfer complete with %d bytes (wanted %d)\n",
-								res, msg.transferBufferLength);
-					}
+
+					android.util.Log.i("wsusb", "Bulk DONE res=" + res + " wanted=" + msg.transferBufferLength);
 
 					if (!context.activeMessages.remove(msg)) {
 						// Somebody cancelled the URB, return without responding
