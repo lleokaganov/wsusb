@@ -60,14 +60,40 @@
             android:textStyle="bold"
             android:typeface="monospace" />
 
-        <!-- Combined sharing status: e.g. "Sharing: CH340 1a86:7523 → relay connected". -->
-        <TextView
-            android:id="@+id/combinedStatus"
+        <!-- Combined sharing status + TX/RX traffic dots: the dots blink when
+             usbws emits "STAT tx=1" / "rx=1" so you can tell at a glance the
+             tunnel has live data flowing. -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/combinedStatus"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <View
+                android:id="@+id/dotTx"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_marginStart="8dp"
+                android:alpha="0.15"
+                android:background="@drawable/dot_tx" />
+
+            <View
+                android:id="@+id/dotRx"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_marginStart="6dp"
+                android:alpha="0.15"
+                android:background="@drawable/dot_rx" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="match_parent"

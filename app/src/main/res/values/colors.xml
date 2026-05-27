@@ -9,4 +9,6 @@
     <color name="status_warn">#FFB74D</color>       <!-- amber for "action needed" hints -->
     <color name="readonly_field_bg">#1FFFFFFF</color> <!-- faint fill to mark read-only invite -->
     <color name="tagline">#9E9E9E</color>           <!-- muted grey for the tagline -->
+    <color name="dot_tx">#64B5F6</color>             <!-- blue dot — outbound traffic -->
+    <color name="dot_rx">#FFB74D</color>             <!-- amber dot — inbound traffic -->
 </resources>

@@ -67,6 +67,16 @@ public class RelayController {
         void onRelayState(State state);
     }
 
+    /**
+     * Callback invoked on the UI thread when the relay process emits a
+     * "STAT tx=N rx=N" stat line. N is 0 (idle in this window) or 1 (had
+     * traffic). Used to blink two little TX/RX dots on screen so the user
+     * sees data is flowing without caring about throughput.
+     */
+    public interface TrafficListener {
+        void onTraffic(boolean tx, boolean rx);
+    }
+
     private final Context appContext;
 
     // Guarded by 'this'.
@@ -74,6 +84,7 @@ public class RelayController {
     private Thread logThread;
     private State state = State.OFF;
     private StateListener listener;
+    private TrafficListener trafficListener;
 
     public RelayController(Context context) {
         // Hold the application context to avoid leaking the Activity.
@@ -82,6 +93,10 @@ public class RelayController {
 
     public synchronized void setStateListener(StateListener l) {
         this.listener = l;
+    }
+
+    public synchronized void setTrafficListener(TrafficListener l) {
+        this.trafficListener = l;
     }
 
     public synchronized State getState() {
@@ -375,7 +390,13 @@ public class RelayController {
         String line;
         try {
             while ((line = br.readLine()) != null) {
-                Log.i(TAG, line);
+                if (line.startsWith("STAT ")) {
+                    // Stat tick: "STAT tx=0|1 rx=0|1". Don't spam logcat with
+                    // these (they fire 4×/s); just hand them to the UI.
+                    handleStatLine(line);
+                } else {
+                    Log.i(TAG, line);
+                }
             }
         } catch (IOException e) {
             // Stream closed (process exited or destroyed) -- expected on stop.
@@ -403,6 +424,38 @@ public class RelayController {
                 setState(State.OFF);
             }
         }
+    }
+
+    /**
+     * Parse a "STAT tx=N rx=N" line from usbws stdout and forward the two
+     * boolean flags to the TrafficListener on the UI thread. Robust to extra
+     * whitespace or missing fields (assume "no traffic" if a field is absent).
+     */
+    private void handleStatLine(String line) {
+        boolean tx = parseFlag(line, "tx=");
+        boolean rx = parseFlag(line, "rx=");
+        final TrafficListener l;
+        synchronized (this) {
+            l = trafficListener;
+        }
+        if (l == null) return;
+        final boolean fTx = tx, fRx = rx;
+        android.os.Handler h = new android.os.Handler(appContext.getMainLooper());
+        h.post(new Runnable() {
+            @Override
+            public void run() {
+                l.onTraffic(fTx, fRx);
+            }
+        });
+    }
+
+    private static boolean parseFlag(String line, String key) {
+        int i = line.indexOf(key);
+        if (i < 0) return false;
+        int p = i + key.length();
+        if (p >= line.length()) return false;
+        char c = line.charAt(p);
+        return c == '1';
     }
 
     /** Updates state and notifies the listener on the UI thread. */

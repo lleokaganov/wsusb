@@ -29,6 +29,11 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.os.VibratorManager;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -67,6 +72,14 @@ public class UsbIpConfig extends ComponentActivity {
 	private TextView ownersList;
 	private Button forgetOwnersButton;
 
+	// Traffic dots (TX/RX) — blinked by RelayController.TrafficListener on each
+	// "STAT tx=N rx=N" stdout line from usbws.
+	private View dotTx;
+	private View dotRx;
+	// alpha used for "idle" (dot present but very dim) — keeps the layout from
+	// jumping when the dot lights up and matches the layout XML's default.
+	private static final float DOT_IDLE_ALPHA = 0.15f;
+
 	// APP section.
 	private TextView appVersion;
 	private Button updateButton;
@@ -86,9 +99,14 @@ public class UsbIpConfig extends ComponentActivity {
 		public void onReceive(Context context, Intent intent) {
 			String action = intent.getAction();
 			if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
+				// Sensory feedback: one short blip + short vibration. Phone-in-
+				// pocket workflow — user knows the device was seen without
+				// looking at the screen.
+				feedbackAttach();
 				// A device just appeared: refresh the line and try to raise the bridge.
 				refreshUsbAndMaybeRaise();
 			} else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
+				feedbackDetach();
 				// Nothing left to share once the (last) device is gone.
 				refreshUsbState();
 				if (firstSharableDevice() == null) {
@@ -133,6 +151,8 @@ public class UsbIpConfig extends ComponentActivity {
 		copyInviteButton = findViewById(R.id.copyInviteButton);
 		ownersList = findViewById(R.id.ownersList);
 		forgetOwnersButton = findViewById(R.id.forgetOwnersButton);
+		dotTx = findViewById(R.id.dotTx);
+		dotRx = findViewById(R.id.dotRx);
 		appVersion = findViewById(R.id.appVersion);
 		updateButton = findViewById(R.id.updateButton);
 
@@ -144,6 +164,13 @@ public class UsbIpConfig extends ComponentActivity {
 			@Override
 			public void onRelayState(RelayController.State state) {
 				updateUi();
+			}
+		});
+		relayController.setTrafficListener(new RelayController.TrafficListener() {
+			@Override
+			public void onTraffic(boolean tx, boolean rx) {
+				blinkDot(dotTx, tx);
+				blinkDot(dotRx, rx);
 			}
 		});
 
@@ -452,6 +479,90 @@ public class UsbIpConfig extends ComponentActivity {
 		// Stop button is a manual override: only shown while something is active.
 		boolean active = relayActive || serviceRunning;
 		stopSharingButton.setVisibility(active ? View.VISIBLE : View.GONE);
+	}
+
+	/**
+	 * Sensory feedback when a USB device is attached: one short DTMF blip
+	 * (~120ms) and a short vibration buzz (~40ms). Intentionally minimal so
+	 * the phone can sit in a pocket and still confirm the event.
+	 */
+	private void feedbackAttach() {
+		playTone(ToneGenerator.TONE_PROP_BEEP, 120);
+		vibrate(40);
+	}
+
+	/**
+	 * Sensory feedback for detach: a "double-tap" (two shorter buzzes + a
+	 * lower-pitched blip) so it's distinguishable from attach without the
+	 * user having to think about which one just happened.
+	 */
+	private void feedbackDetach() {
+		playTone(ToneGenerator.TONE_PROP_BEEP2, 90);
+		vibratePattern(new long[]{0, 40, 60, 40});
+	}
+
+	private void playTone(int toneType, int durationMs) {
+		try {
+			// Notification stream so the user's media volume isn't bothered.
+			// 80/100 volume is audible without being startling.
+			final ToneGenerator tg = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80);
+			tg.startTone(toneType, durationMs);
+			// Tone runs async; release the generator slightly after the tone ends.
+			new android.os.Handler(getMainLooper()).postDelayed(new Runnable() {
+				@Override
+				public void run() {
+					tg.release();
+				}
+			}, durationMs + 50);
+		} catch (RuntimeException ignored) {
+			// Some devices throw if the audio service is busy; not critical.
+		}
+	}
+
+	@SuppressWarnings("deprecation")
+	private void vibrate(long ms) {
+		Vibrator v = obtainVibrator();
+		if (v == null) return;
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+			v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
+		} else {
+			v.vibrate(ms);
+		}
+	}
+
+	@SuppressWarnings("deprecation")
+	private void vibratePattern(long[] pattern) {
+		Vibrator v = obtainVibrator();
+		if (v == null) return;
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+			v.vibrate(VibrationEffect.createWaveform(pattern, -1));
+		} else {
+			v.vibrate(pattern, -1);
+		}
+	}
+
+	private Vibrator obtainVibrator() {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+			VibratorManager vm = (VibratorManager) getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
+			return vm != null ? vm.getDefaultVibrator() : null;
+		}
+		return (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+	}
+
+	/**
+	 * Light up a traffic dot if active=true, otherwise fade it back to the
+	 * idle (very dim) state. Animation is short so rapid STAT ticks visually
+	 * coalesce into a "lit" dot rather than flickering.
+	 */
+	private void blinkDot(View dot, boolean active) {
+		if (dot == null) return;
+		dot.animate().cancel();
+		if (active) {
+			dot.setAlpha(1f);
+			dot.animate().alpha(DOT_IDLE_ALPHA).setDuration(200).start();
+		} else {
+			dot.animate().alpha(DOT_IDLE_ALPHA).setDuration(120).start();
+		}
 	}
 
 	/**
