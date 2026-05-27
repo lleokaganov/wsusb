@@ -66,7 +66,7 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 	private WifiLock highPerfWifiLock;
 	private WifiLock lowLatencyWifiLock;
 	
-	private static final boolean DEBUG = false;
+	private static final boolean DEBUG = true;
 	
 	private static final int NOTIFICATION_ID = 100;
 
