@@ -85,6 +85,7 @@ public class UsbIpConfig extends ComponentActivity {
 	// Prominent server-connection indicator (large dot + label) at top of screen.
 	private View connDot;
 	private TextView connStatus;
+	private TextView connUrl;
 
 	// Settings activity launcher.
 	private Button settingsButton;
@@ -160,6 +161,7 @@ public class UsbIpConfig extends ComponentActivity {
 		dotRx = findViewById(R.id.dotRx);
 		connDot = findViewById(R.id.connDot);
 		connStatus = findViewById(R.id.connStatus);
+		connUrl = findViewById(R.id.connUrl);
 		settingsButton = findViewById(R.id.settingsButton);
 
 		serviceRunning = isMyServiceRunning(UsbIpService.class);
@@ -616,6 +618,15 @@ public class UsbIpConfig extends ComponentActivity {
 		connDot.setBackgroundTintList(android.content.res.ColorStateList.valueOf(tint));
 		connStatus.setText(textId);
 		connStatus.setTextColor(tint);
+
+		// Live URL line: what the running subprocess is talking to right now.
+		// If nothing is running, show the URL prefs will use on next start so
+		// the user can sanity-check Settings without having to dig in.
+		String liveUrl = relayController.getCurrentRelayUrl();
+		if (liveUrl == null) {
+			liveUrl = new Settings(this).getRelayUrl();
+		}
+		connUrl.setText(liveUrl);
 	}
 
 	/**

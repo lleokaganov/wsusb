@@ -82,6 +82,17 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- Live URL the subprocess is actually using right now (may differ
+             from prefs if the user saved a new URL but hasn't applied it). -->
+        <TextView
+            android:id="@+id/connUrl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/helper_text"
+            android:textSize="11sp"
+            android:typeface="monospace" />
+
         <!-- =============================================================
              SECTION — DEVICE (live USB status + combined sharing status)
              Sharing is raised automatically whenever a device is attached

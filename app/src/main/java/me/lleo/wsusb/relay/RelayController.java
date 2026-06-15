@@ -102,6 +102,11 @@ public class RelayController {
     private State state = State.OFF;
     private StateListener listener;
     private TrafficListener trafficListener;
+    // The relay URL the running subprocess was started with. Surfaces on the
+    // main screen so you can see at a glance which server you're actually
+    // talking to — distinct from whatever is currently saved in prefs (which
+    // only takes effect on the next start).
+    private String currentRelayUrl;
 
     public RelayController(Context context) {
         // Hold the application context to avoid leaking the Activity.
@@ -122,6 +127,29 @@ public class RelayController {
 
     public synchronized boolean isRunning() {
         return process != null;
+    }
+
+    /**
+     * URL the running subprocess was started with, or null if no subprocess.
+     * Use this on the main screen — what's in SharedPreferences may differ
+     * because the subprocess only picks up env on (re)start.
+     */
+    public synchronized String getCurrentRelayUrl() {
+        return process != null ? currentRelayUrl : null;
+    }
+
+    /**
+     * Restart the subprocess so it picks up new prefs (server URL, keys, etc).
+     * No-op if it wasn't running — you'd just call start() in that case. Used
+     * by SettingsActivity right after Save so the user doesn't need to do
+     * "Stop sharing" → re-plug manually.
+     */
+    public synchronized void restartIfRunning() {
+        if (process == null) return;
+        stop();
+        // start() spawns a worker thread for the actual exec, so we can call
+        // it back-to-back without blocking the caller.
+        start();
     }
 
     /** One authorized owner parsed from the authorized table. */
@@ -403,6 +431,7 @@ public class RelayController {
             synchronized (this) {
                 process = p;
                 logThread = reader;
+                currentRelayUrl = relayUrl;
                 // Process is up but the WS hasn't reported "connected" yet;
                 // start in DISCONNECTED so the UI immediately shows red and
                 // flips to green only when we see "[usbws] relay connected".
@@ -461,6 +490,7 @@ public class RelayController {
             if (process == p) {
                 process = null;
                 logThread = null;
+                currentRelayUrl = null;
                 setState(State.OFF);
             }
         }

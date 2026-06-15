@@ -65,6 +65,7 @@
     <string name="server_url_help">Known hosts auto-bind the matching relay key. Default is wss://tele.karlson.ru/ws. Change requires Stop sharing → start to take effect.</string>
     <string name="server_save">Save</string>
     <string name="server_saved">Saved — restart sharing to apply</string>
+    <string name="server_applied">Saved and applied — relay restarted</string>
     <string name="server_invalid">URL must start with ws:// or wss://</string>
     <string name="server_unknown_keys">Custom host — relay keys will use the built-in fallback. Edit only if you know the relay\'s X25519/Ed25519 public keys match.</string>
 

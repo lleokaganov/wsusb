@@ -11,6 +11,8 @@ import androidx.activity.ComponentActivity;
 import androidx.core.content.ContextCompat;
 
 import me.lleo.wsusb.R;
+import me.lleo.wsusb.WsusbApp;
+import me.lleo.wsusb.relay.RelayController;
 import me.lleo.wsusb.relay.Updater;
 
 /**
@@ -71,10 +73,22 @@ public class SettingsActivity extends ComponentActivity {
                             R.string.server_invalid, Toast.LENGTH_LONG).show();
                     return;
                 }
+                String prev = settings.getRelayUrl();
                 settings.setRelayUrl(url);
-                Toast.makeText(SettingsActivity.this,
-                        R.string.server_saved, Toast.LENGTH_LONG).show();
                 refreshKeysNote(url);
+                // Subprocess only reads env on (re)start, so applying the URL
+                // change means stopping and starting the relay. Otherwise the
+                // user would have to Stop sharing → re-plug by hand and the
+                // green dot would still report the OLD server until they did.
+                RelayController rc = ((WsusbApp) getApplication()).getRelayController();
+                if (rc.isRunning() && !url.equals(prev)) {
+                    rc.restartIfRunning();
+                    Toast.makeText(SettingsActivity.this,
+                            R.string.server_applied, Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(SettingsActivity.this,
+                            R.string.server_saved, Toast.LENGTH_LONG).show();
+                }
             }
         });
 
