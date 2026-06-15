@@ -12,6 +12,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import me.lleo.wsusb.WsusbApp;
 import me.lleo.wsusb.config.UsbIpConfig;
 import me.lleo.wsusb.server.UsbDeviceInfo;
 import me.lleo.wsusb.server.UsbIpServer;
@@ -191,6 +192,20 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 	public IBinder onBind(Intent intent) {
 		// Not currently bindable
 		return null;
+	}
+
+	@Override
+	public void onTaskRemoved(Intent rootIntent) {
+		// User swiped the app away (or killed it from Recents). Tear down the
+		// relay subprocess and stop ourselves so "app closed" really means
+		// "phone is offline" from the remote computer's point of view —
+		// no zombie sockets hanging around in the background.
+		super.onTaskRemoved(rootIntent);
+		try {
+			((WsusbApp) getApplication()).getRelayController().stop();
+		} catch (Exception ignored) {
+		}
+		stopSelf();
 	}
 	
 	// Here we're going to enumerate interfaces and endpoints

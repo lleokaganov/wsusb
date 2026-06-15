@@ -60,7 +60,6 @@ import androidx.core.content.ContextCompat;
 public class UsbIpConfig extends ComponentActivity {
 	// DEVICE section.
 	private TextView usbDeviceInfo;
-	private TextView combinedStatus;
 	private Button stopSharingButton;
 
 	// Relay (encrypted tunnel) controller — drives libusbws.so.
@@ -85,7 +84,6 @@ public class UsbIpConfig extends ComponentActivity {
 	// Prominent server-connection indicator (large dot + label) at top of screen.
 	private View connDot;
 	private TextView connStatus;
-	private TextView connUrl;
 
 	// Settings activity launcher.
 	private Button settingsButton;
@@ -113,18 +111,12 @@ public class UsbIpConfig extends ComponentActivity {
 				refreshUsbAndMaybeRaise();
 			} else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
 				feedbackDetach();
-				// Nothing left to share once the (last) device is gone.
+				// The relay stays up while the app is open — the phone is on
+				// the line independent of any USB device. Detach just leaves
+				// "no devices to enumerate" for the remote side; the WS link
+				// itself is not torn down. (Stop sharing still tears everything
+				// down explicitly when the user wants that.)
 				refreshUsbState();
-				if (firstSharableDevice() == null) {
-					// Auto-stop the relay; the local server can stay up cheaply,
-					// but with no device attached there is nothing to import, so we
-					// tear it down too for a clean idle state.
-					if (relayController.isRunning()
-							|| relayController.getState() == RelayController.State.CONNECTING) {
-						relayController.stop();
-					}
-					stopServiceIfRunning();
-				}
 				updateUi();
 			}
 		}
@@ -151,7 +143,6 @@ public class UsbIpConfig extends ComponentActivity {
 		usbManager = (UsbManager) getSystemService(Context.USB_SERVICE);
 
 		usbDeviceInfo = findViewById(R.id.usbDeviceInfo);
-		combinedStatus = findViewById(R.id.combinedStatus);
 		stopSharingButton = findViewById(R.id.stopSharingButton);
 		myInvite = findViewById(R.id.myInvite);
 		copyInviteButton = findViewById(R.id.copyInviteButton);
@@ -161,7 +152,6 @@ public class UsbIpConfig extends ComponentActivity {
 		dotRx = findViewById(R.id.dotRx);
 		connDot = findViewById(R.id.connDot);
 		connStatus = findViewById(R.id.connStatus);
-		connUrl = findViewById(R.id.connUrl);
 		settingsButton = findViewById(R.id.settingsButton);
 
 		serviceRunning = isMyServiceRunning(UsbIpService.class);
@@ -388,25 +378,10 @@ public class UsbIpConfig extends ComponentActivity {
 
 	// ===================== USB enumeration / auto-raise =====================
 
-	/** Returns the first attached non-hub USB device, or null if none. */
-	private UsbDevice firstSharableDevice() {
-		for (UsbDevice dev : usbManager.getDeviceList().values()) {
-			if (dev.getDeviceClass() != UsbConstants.USB_CLASS_HUB) {
-				return dev;
-			}
-		}
-		// Fall back to any device (even a hub) so we never report "none" when the
-		// list is non-empty; the first non-hub is preferred above.
-		for (UsbDevice dev : usbManager.getDeviceList().values()) {
-			return dev;
-		}
-		return null;
-	}
-
-	/** Refreshes the USB line, then attempts an auto-raise, then redraws the UI. */
+	/** Refreshes the USB line, ensures the relay is up, then redraws the UI. */
 	private void refreshUsbAndMaybeRaise() {
 		refreshUsbState();
-		maybeAutoRaise();
+		ensureRelayUp();
 		updateUi();
 	}
 
@@ -416,16 +391,16 @@ public class UsbIpConfig extends ComponentActivity {
 	}
 
 	/**
-	 * Core auto-flow: if a USB device is attached, start the USB/IP service and the
-	 * relay (accept-incoming mode) with no confirmation. No peer is required — the
-	 * first remote computer that connects with our invite becomes the owner. Does
-	 * nothing if no device is present or if the relay is already up.
+	 * Always-on relay: as long as the app is open, the foreground service and
+	 * the libusbws.so subprocess are running and the WS link to the relay is
+	 * held. This is INDEPENDENT of USB device presence — the remote computer
+	 * can still enumerate (it'll see an empty device list when nothing is
+	 * plugged in) and the phone-on-the-line indicator stays meaningful.
+	 *
+	 * Stop sharing tears the relay down explicitly; otherwise it only goes
+	 * away when the app is swiped away (UsbIpService.onTaskRemoved).
 	 */
-	private void maybeAutoRaise() {
-		UsbDevice dev = firstSharableDevice();
-		if (dev == null) {
-			return; // No device — nothing to share.
-		}
+	private void ensureRelayUp() {
 		if (relayController.isRunning()
 				|| relayController.getState() == RelayController.State.CONNECTING) {
 			return; // Already raising / raised.
@@ -526,55 +501,15 @@ public class UsbIpConfig extends ComponentActivity {
 			usbDeviceInfo.setTextColor(ContextCompat.getColor(this, R.color.status_ok));
 		}
 
-		// ---- Combined sharing status + Stop button visibility ----
-		UsbDevice sharable = firstSharableDevice();
+		// ---- Stop button + top connection indicator ----
 		RelayController.State relayState = relayController.getState();
 		boolean relayActive = relayController.isRunning()
 				|| relayState == RelayController.State.CONNECTING;
 
-		if (sharable == null) {
-			// No device attached.
-			combinedStatus.setText(R.string.status_idle_no_device);
-			combinedStatus.setTextColor(ContextCompat.getColor(this, R.color.status_idle));
-		} else if (!relayActive) {
-			// Device present but the relay is not up yet (e.g. permission pending):
-			// it will be raised automatically, so show a waiting hint.
-			combinedStatus.setText(R.string.status_waiting_owner);
-			combinedStatus.setTextColor(ContextCompat.getColor(this, R.color.status_warn));
-		} else {
-			// Device + active relay: report the live relay state inline.
-			String relayWord;
-			int color;
-			switch (relayState) {
-				case ON:
-					relayWord = getString(R.string.relay_connected);
-					color = R.color.status_ok;
-					break;
-				case CONNECTING:
-					relayWord = getString(R.string.relay_connecting);
-					color = R.color.status_warn;
-					break;
-				case DISCONNECTED:
-					relayWord = getString(R.string.relay_connecting);
-					color = R.color.status_bad;
-					break;
-				case ERROR:
-					relayWord = getString(R.string.relay_error);
-					color = R.color.status_bad;
-					break;
-				case OFF:
-				default:
-					relayWord = getString(R.string.relay_off);
-					color = R.color.status_idle;
-					break;
-			}
-			String text = "Sharing: " + deviceLabel(sharable) + " "
-					+ vidPid(sharable) + " → " + relayWord;
-			combinedStatus.setText(text);
-			combinedStatus.setTextColor(ContextCompat.getColor(this, color));
-		}
-
-		// Stop button is a manual override: only shown while something is active.
+		// Stop button is a manual override: only shown while the relay or the
+		// foreground service is actually running. There is no per-device
+		// "sharing" label any more — every attached device is offered to the
+		// remote and that's what the DEVICE list above already shows.
 		boolean active = relayActive || serviceRunning;
 		stopSharingButton.setVisibility(active ? View.VISIBLE : View.GONE);
 
@@ -584,13 +519,19 @@ public class UsbIpConfig extends ComponentActivity {
 	}
 
 	/**
-	 * Top-of-screen indicator. Red = relay not connected (or error). Amber =
-	 * subprocess starting / connecting. Green = WS link to the relay is up.
-	 * Grey = off (no subprocess yet).
+	 * Top-of-screen indicator. Red = WS link to the relay is down (or never
+	 * came up). Amber = subprocess starting / WS opening. Green = WS link up,
+	 * phone is on the line. Grey = subprocess not running at all (e.g. before
+	 * onResume finished, or after explicit Stop sharing).
+	 *
+	 * Label is "<state>: <host>" so you can see at a glance which server you
+	 * are actually connected to (the running subprocess's URL — NOT prefs,
+	 * which only take effect on the next start).
 	 */
 	private void updateConnectionIndicator(RelayController.State relayState) {
 		int colorId;
 		int textId;
+		boolean showHost = true;
 		switch (relayState) {
 			case ON:
 				colorId = R.color.status_ok;
@@ -612,21 +553,35 @@ public class UsbIpConfig extends ComponentActivity {
 			default:
 				colorId = R.color.status_idle;
 				textId = R.string.conn_status_off;
+				showHost = false;
 				break;
 		}
 		int tint = ContextCompat.getColor(this, colorId);
 		connDot.setBackgroundTintList(android.content.res.ColorStateList.valueOf(tint));
-		connStatus.setText(textId);
-		connStatus.setTextColor(tint);
-
-		// Live URL line: what the running subprocess is talking to right now.
-		// If nothing is running, show the URL prefs will use on next start so
-		// the user can sanity-check Settings without having to dig in.
-		String liveUrl = relayController.getCurrentRelayUrl();
-		if (liveUrl == null) {
-			liveUrl = new Settings(this).getRelayUrl();
+		if (showHost) {
+			// Prefer the URL the subprocess is actually using; if it isn't
+			// running yet, show prefs so the user can sanity-check before start.
+			String liveUrl = relayController.getCurrentRelayUrl();
+			if (liveUrl == null) {
+				liveUrl = new Settings(this).getRelayUrl();
+			}
+			connStatus.setText(getString(textId, hostOf(liveUrl)));
+		} else {
+			connStatus.setText(textId);
 		}
-		connUrl.setText(liveUrl);
+		connStatus.setTextColor(tint);
+	}
+
+	/** Extract just the host out of a ws[s]:// URL, e.g. "tele.karlson.ru". */
+	private static String hostOf(String url) {
+		if (url == null) return "?";
+		try {
+			android.net.Uri u = android.net.Uri.parse(url);
+			String host = u.getHost();
+			return host != null ? host : url;
+		} catch (Exception e) {
+			return url;
+		}
 	}
 
 	/**

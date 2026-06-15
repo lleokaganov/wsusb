@@ -17,22 +17,24 @@
     <string name="section_brand">BRAND</string>
 
     <!-- Device / status section -->
-    <string name="device_section_hint">Plug a device into the phone via OTG. When a device is present, sharing starts automatically. The first computer that connects with your invite becomes its owner.</string>
+    <string name="device_section_hint">Plug devices into the phone via OTG. Every attached non-hub device is offered to the remote computer (it picks one with usbip attach -b &lt;busid&gt;). The first computer that connects with your invite becomes the owner.</string>
     <string name="usb_none">USB device: none — plug one in via OTG</string>
     <string name="stop_sharing">Stop sharing</string>
     <string name="settings_button">Settings</string>
+    <string name="traffic_label">Tunnel traffic (tx / rx)</string>
 
     <!-- Combined status lines -->
     <string name="status_idle_no_device">Idle — plug in a device</string>
     <string name="status_waiting_owner">Waiting for a computer to connect with your invite…</string>
 
-    <!-- Server-connection (relay) status banner -->
+    <!-- Server-connection (relay) status banner. The "%1$s" placeholder is
+         the relay host (no scheme, no path) — see UsbIpConfig.formatHost(). -->
     <string name="conn_status_label">Relay:</string>
     <string name="conn_status_off">stopped</string>
-    <string name="conn_status_connecting">connecting…</string>
-    <string name="conn_status_connected">connected</string>
-    <string name="conn_status_disconnected">disconnected — retrying</string>
-    <string name="conn_status_error">error</string>
+    <string name="conn_status_connecting">connecting: %1$s</string>
+    <string name="conn_status_connected">connected: %1$s</string>
+    <string name="conn_status_disconnected">error: %1$s</string>
+    <string name="conn_status_error">error: %1$s</string>
 
     <!-- Your invite section -->
     <string name="your_invite_hint">Copy this and give it to the remote computer so it can reach you and become an owner.</string>

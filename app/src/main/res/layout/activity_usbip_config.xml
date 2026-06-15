@@ -12,7 +12,9 @@
         android:paddingRight="24dp"
         android:paddingTop="28dp">
 
-        <!-- ===== Title row with Settings button on the right ===== -->
+        <!-- Title is already shown in the system action bar (android:label="wsusb"
+             on the activity), so we only render the tagline + Settings button
+             here — no second "wsusb" header. -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -23,9 +25,9 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="@string/app_title"
-                android:textSize="30sp"
-                android:textStyle="bold" />
+                android:text="@string/app_tagline"
+                android:textColor="@color/tagline"
+                android:textSize="14sp" />
 
             <Button
                 android:id="@+id/settingsButton"
@@ -34,14 +36,6 @@
                 android:minWidth="0dp"
                 android:text="@string/settings_button" />
         </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="@string/app_tagline"
-            android:textColor="@color/tagline"
-            android:textSize="14sp" />
 
         <!-- =============================================================
              PROMINENT relay-server connection state (red / amber / green).
@@ -82,17 +76,6 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Live URL the subprocess is actually using right now (may differ
-             from prefs if the user saved a new URL but hasn't applied it). -->
-        <TextView
-            android:id="@+id/connUrl"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:textColor="@color/helper_text"
-            android:textSize="11sp"
-            android:typeface="monospace" />
-
         <!-- =============================================================
              SECTION — DEVICE (live USB status + combined sharing status)
              Sharing is raised automatically whenever a device is attached
@@ -115,7 +98,9 @@
             android:layout_marginBottom="12dp"
             android:background="@color/separator" />
 
-        <!-- Live USB device line (none / technical info, updated by the receiver). -->
+        <!-- Live USB device line(s): one row per attached device, updated by
+             the USB receiver. All listed devices are available to the remote
+             side (it picks one via "usbip attach -b <busid>"). -->
         <TextView
             android:id="@+id/usbDeviceInfo"
             android:layout_width="match_parent"
@@ -125,23 +110,39 @@
             android:textStyle="bold"
             android:typeface="monospace" />
 
-        <!-- Combined sharing status + TX/RX traffic dots: the dots blink when
-             usbws emits "STAT tx=1" / "rx=1" so you can tell at a glance the
-             tunnel has live data flowing. -->
+        <!-- Second separator: visually closes the "list of devices" box so the
+             traffic / help text below is not mistaken for another device. -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="10dp"
+            android:background="@color/separator" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/device_section_hint"
+            android:textColor="@color/helper_text"
+            android:textSize="13sp" />
+
+        <!-- TX/RX traffic dots: they blink when usbws emits "STAT tx=1" /
+             "rx=1" so the user can tell at a glance the tunnel has live data
+             flowing through it — independent of the relay-connected state. -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
             <TextView
-                android:id="@+id/combinedStatus"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+                android:text="@string/traffic_label"
+                android:textColor="@color/helper_text"
+                android:textSize="12sp" />
 
             <View
                 android:id="@+id/dotTx"
@@ -159,14 +160,6 @@
                 android:alpha="0.15"
                 android:background="@drawable/dot_rx" />
         </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="@string/device_section_hint"
-            android:textColor="@color/helper_text"
-            android:textSize="13sp" />
 
         <!-- Manual override: only enabled/visible while something is being shared. -->
         <Button
