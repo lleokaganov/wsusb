@@ -478,54 +478,55 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 							+ (msg.direction == UsbIpDevicePacket.USBIP_DIR_IN ? "in" : "out")
 							+ " EP " + selectedEndpoint.getEndpointNumber());
 
+					// IN direction: zero the buffer before each transfer so a
+					// stale "Android bulkTransfer returns positive actualLength
+					// with leftover bytes from a previous URB" outcome can't
+					// re-deliver old data. (CH340 in idle reproduced this as
+					// the chunk "...кт от всех сетей..." repeated dozens of
+					// times. Out-direction buffers carry the host's payload,
+					// must NOT be cleared.)
+					if (msg.direction == UsbIpDevicePacket.USBIP_DIR_IN) {
+						java.util.Arrays.fill(buff.array(), (byte) 0);
+					}
+
+					// Single short poll instead of the old infinite do-while
+					// on -110. On timeout we send a successful zero-length URB,
+					// just like the INTERRUPT branch does — kernel-side driver
+					// resubmits at its own pace and no replay can happen.
 					int res;
-					int retries = 0;
-					do {
+					synchronized (selectedEndpoint) {
 						// UsbDeviceConnection.bulkTransfer() is NOT thread-safe per
 						// endpoint — two concurrent calls on the same endpoint cause
-						// one to fail with -108 (ESHUTDOWN), which we then propagate
-						// as an error and kernel tears the device down. Serialize
-						// per-endpoint to keep the chip happy under load.
-						synchronized (selectedEndpoint) {
-							res = XferUtils.doBulkTransfer(context.devConn, selectedEndpoint, buff.array(), 1000);
-						}
-						retries++;
-						if (retries == 1 || retries % 5 == 0) {
-							android.util.Log.i("wsusb", "Bulk try=" + retries + " res=" + res
-									+ " EP " + selectedEndpoint.getEndpointNumber()
-									+ " " + (msg.direction == UsbIpDevicePacket.USBIP_DIR_IN ? "in" : "out"));
-						}
-
-						if (context.requestPool.isShutdown()) {
-							// Bail if the queue is being torn down
-							return;
-						}
-
-						if (!context.activeMessages.contains(msg)) {
-							// Somebody cancelled the URB, return without responding
-							return;
-						}
-					} while (res == -110); // ETIMEDOUT
+						// one to fail with -108 (ESHUTDOWN). Serialize per-endpoint
+						// to keep the chip happy under load.
+						res = XferUtils.doBulkTransfer(context.devConn, selectedEndpoint, buff.array(), 250);
+					}
 
 					android.util.Log.i("wsusb", "Bulk DONE res=" + res + " wanted=" + msg.transferBufferLength);
 
+					if (context.requestPool.isShutdown()) {
+						return;
+					}
 					if (!context.activeMessages.remove(msg)) {
 						// Somebody cancelled the URB, return without responding
 						return;
 					}
-					
-					if (res < 0) {
-						// If the request failed, let's see if the device is still around
+
+					if (res == -110 || (res == 0 && msg.direction == UsbIpDevicePacket.USBIP_DIR_IN)) {
+						// No new bytes in this poll window — legitimate USB
+						// outcome, not an error. Tell the kernel "URB completed,
+						// zero length"; it will resubmit when it wants more.
+						reply.actualLength = 0;
+						reply.status = ProtoDefs.ST_OK;
+					} else if (res < 0) {
+						// Real failure path — keep the original device-gone check.
 						UsbDevice dev = getDevice(deviceId);
 						if (dev == null) {
-							// The device is gone, so terminate the client
 							server.killClient(s);
 							return;
 						}
-
 						reply.status = res;
-					}
-					else {
+					} else {
 						reply.actualLength = res;
 						reply.status = ProtoDefs.ST_OK;
 					}
