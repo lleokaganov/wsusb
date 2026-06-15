@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Round status dot. Fill is white so the View's android:backgroundTint
+     can recolor it at runtime (red = relay down, green = relay up, etc.). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+       android:shape="oval">
+    <solid android:color="#FFFFFFFF" />
+    <size android:width="14dp" android:height="14dp" />
+</shape>

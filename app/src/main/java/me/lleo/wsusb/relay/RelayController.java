@@ -10,6 +10,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+
+import me.lleo.wsusb.config.Settings;
 
 /**
  * Drives the bundled usbws native binary (libusbws.so) to bridge the local
@@ -54,11 +57,25 @@ public class RelayController {
     // Local TCP endpoint of the USB/IP server (UsbIpServer.PORT == 3240).
     private static final String LOCAL_ENDPOINT = "127.0.0.1:3240";
 
-    /** Relay lifecycle state for the UI. */
+    /**
+     * Combined lifecycle + connectivity state for the UI.
+     *
+     * OFF / CONNECTING / ON describe the subprocess. ON used to mean "process
+     * started" only — we now refine it by parsing usbws stdout so the UI can
+     * distinguish "process up but WS not connected yet" (DISCONNECTED → red)
+     * from "WS connected to the relay" (ON → green) and from "WS dropped,
+     * the binary's own retry loop is retrying" (DISCONNECTED → red).
+     */
     public enum State {
+        /** Subprocess not running. */
         OFF,
+        /** Subprocess starting, no stdout yet. */
         CONNECTING,
+        /** Subprocess up AND relay reports a live WebSocket. */
         ON,
+        /** Subprocess up but relay WebSocket is currently dropped / retrying. */
+        DISCONNECTED,
+        /** Subprocess failed to start (exec error or immediate exit). */
         ERROR
     }
 
@@ -351,11 +368,27 @@ public class RelayController {
                     LOCAL_ENDPOINT,
                     "--accept");
             // usbws load-or-creates this identity, so it exists after the first run.
-            pb.environment().put("USBWS_IDENTITY", identity.getAbsolutePath());
+            Map<String, String> env = pb.environment();
+            env.put("USBWS_IDENTITY", identity.getAbsolutePath());
+
+            // Wire up the configured WS endpoint + matching relay pubkeys. We
+            // resolve them here (not in the binary) so the user can pick a
+            // server in Settings without touching native code; unknown hosts
+            // leave the env unset and the binary falls back to its own defaults.
+            Settings settings = new Settings(appContext);
+            String relayUrl = settings.getRelayUrl();
+            env.put("USBWS_WS_URL", relayUrl);
+            String[] keys = Settings.lookupServerKeys(relayUrl);
+            if (keys != null && keys.length == 2) {
+                env.put("USBWS_SERVER_X_PUB", keys[0]);
+                env.put("USBWS_SERVER_ED_PUB", keys[1]);
+            }
             pb.redirectErrorStream(true);
 
             Log.i(TAG, "starting relay: " + binaryPath + " tcp-connect "
-                    + LOCAL_ENDPOINT + " --accept (identity=" + identity.getAbsolutePath() + ")");
+                    + LOCAL_ENDPOINT + " --accept (identity=" + identity.getAbsolutePath()
+                    + ", url=" + relayUrl
+                    + ", keys=" + (keys != null ? "preset" : "binary-default") + ")");
 
             Process p = pb.start();
 
@@ -370,7 +403,10 @@ public class RelayController {
             synchronized (this) {
                 process = p;
                 logThread = reader;
-                setState(State.ON);
+                // Process is up but the WS hasn't reported "connected" yet;
+                // start in DISCONNECTED so the UI immediately shows red and
+                // flips to green only when we see "[usbws] relay connected".
+                setState(State.DISCONNECTED);
             }
 
             reader.start();
@@ -396,6 +432,10 @@ public class RelayController {
                     handleStatLine(line);
                 } else {
                     Log.i(TAG, line);
+                    // Parse the binary's own connectivity messages so the UI
+                    // can show a sharp red/green status without spawning more
+                    // sidecars. usbws emits one of these on each transition.
+                    maybeUpdateConnState(line);
                 }
             }
         } catch (IOException e) {
@@ -423,6 +463,39 @@ public class RelayController {
                 logThread = null;
                 setState(State.OFF);
             }
+        }
+    }
+
+    /**
+     * Maps each interesting usbws stdout line to a state transition. The
+     * binary owns the actual reconnect; we only mirror its view to the UI.
+     *
+     * Strings we look for are the eprintln! lines in usbws/src/relay.rs and
+     * usbws/src/main.rs — keep this in sync with that crate's log wording.
+     */
+    private void maybeUpdateConnState(String line) {
+        State next = null;
+        if (line.contains("relay connected") || line.contains("bridge ready")) {
+            next = State.ON;
+        } else if (line.contains("connect failed")
+                || line.contains("relay unavailable")
+                || line.contains("relay closed")
+                || line.contains("handshake failed")
+                || line.contains("handshake send failed")
+                || line.contains("ws error")
+                || line.contains("send failed")
+                || line.contains("reconnecting")) {
+            next = State.DISCONNECTED;
+        }
+        if (next == null) {
+            return;
+        }
+        synchronized (this) {
+            // Only push state changes from inside an active subprocess; if we
+            // raced with stop() and the process is gone, ignore the line.
+            if (process == null) return;
+            if (state == next) return;
+            setState(next);
         }
     }
 

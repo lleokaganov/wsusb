@@ -12,13 +12,28 @@
         android:paddingRight="24dp"
         android:paddingTop="28dp">
 
-        <!-- ===== Title / tagline ===== -->
-        <TextView
+        <!-- ===== Title row with Settings button on the right ===== -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/app_title"
-            android:textSize="30sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/app_title"
+                android:textSize="30sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/settingsButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="0dp"
+                android:text="@string/settings_button" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="match_parent"
@@ -29,6 +44,45 @@
             android:textSize="14sp" />
 
         <!-- =============================================================
+             PROMINENT relay-server connection state (red / amber / green).
+             A 14dp tinted dot + a one-line label so the user can see at a
+             glance whether the WS link to the relay is up.
+             ============================================================= -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <View
+                android:id="@+id/connDot"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:background="@drawable/dot_status"
+                android:backgroundTint="@color/status_idle" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_marginLeft="8dp"
+                android:text="@string/conn_status_label"
+                android:textColor="@color/helper_text"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/connStatus"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_marginLeft="6dp"
+                android:layout_weight="1"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- =============================================================
              SECTION — DEVICE (live USB status + combined sharing status)
              Sharing is raised automatically whenever a device is attached
              (accept mode needs no peer); the button is a manual override only.
@@ -36,7 +90,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
+            android:layout_marginTop="24dp"
             android:letterSpacing="0.08"
             android:text="@string/section_device"
             android:textColor="@color/section_heading"
@@ -215,40 +269,6 @@
             android:layout_marginTop="10dp"
             android:text="@string/forget_owners"
             android:visibility="gone" />
-
-        <!-- =============================================================
-             SECTION — APP (version + self-update)
-             ============================================================= -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            android:letterSpacing="0.08"
-            android:text="@string/section_app"
-            android:textColor="@color/section_heading"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="12dp"
-            android:background="@color/separator" />
-
-        <TextView
-            android:id="@+id/appVersion"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/helper_text"
-            android:textSize="13sp" />
-
-        <Button
-            android:id="@+id/updateButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/check_for_updates" />
 
     </LinearLayout>
 

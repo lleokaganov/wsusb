@@ -6,7 +6,6 @@ import java.util.Locale;
 
 import me.lleo.wsusb.WsusbApp;
 import me.lleo.wsusb.relay.RelayController;
-import me.lleo.wsusb.relay.Updater;
 import me.lleo.wsusb.service.UsbIpService;
 import me.lleo.wsusb.R;
 
@@ -20,6 +19,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
@@ -81,9 +83,12 @@ public class UsbIpConfig extends ComponentActivity {
 	// jumping when the dot lights up and matches the layout XML's default.
 	private static final float DOT_IDLE_ALPHA = 0.15f;
 
-	// APP section.
-	private TextView appVersion;
-	private Button updateButton;
+	// Prominent server-connection indicator (large dot + label) at top of screen.
+	private View connDot;
+	private TextView connStatus;
+
+	// Settings activity launcher.
+	private Button settingsButton;
 
 	private UsbManager usbManager;
 

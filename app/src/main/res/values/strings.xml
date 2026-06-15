@@ -1,6 +1,6 @@
 <resources>
 
-    <string name="app_name">USB/IP Server</string>
+    <string name="app_name">wsusb</string>
     <string name="service_name">USB/IP Server Service</string>
 
     <!-- Title / tagline -->
@@ -12,15 +12,27 @@
     <string name="section_your_invite">YOUR INVITE</string>
     <string name="section_owners">OWNERS</string>
     <string name="section_app">APP</string>
+    <string name="section_server">SERVER</string>
+    <string name="section_about">ABOUT</string>
+    <string name="section_brand">BRAND</string>
 
     <!-- Device / status section -->
     <string name="device_section_hint">Plug a device into the phone via OTG. When a device is present, sharing starts automatically. The first computer that connects with your invite becomes its owner.</string>
     <string name="usb_none">USB device: none — plug one in via OTG</string>
     <string name="stop_sharing">Stop sharing</string>
+    <string name="settings_button">Settings</string>
 
     <!-- Combined status lines -->
     <string name="status_idle_no_device">Idle — plug in a device</string>
     <string name="status_waiting_owner">Waiting for a computer to connect with your invite…</string>
+
+    <!-- Server-connection (relay) status banner -->
+    <string name="conn_status_label">Relay:</string>
+    <string name="conn_status_off">stopped</string>
+    <string name="conn_status_connecting">connecting…</string>
+    <string name="conn_status_connected">connected</string>
+    <string name="conn_status_disconnected">disconnected — retrying</string>
+    <string name="conn_status_error">error</string>
 
     <!-- Your invite section -->
     <string name="your_invite_hint">Copy this and give it to the remote computer so it can reach you and become an owner.</string>
@@ -45,4 +57,26 @@
     <!-- App / self-update section -->
     <string name="app_version_label">Version</string>
     <string name="check_for_updates">Check for updates</string>
+
+    <!-- Settings activity -->
+    <string name="settings_title">Settings</string>
+    <string name="server_url_label">Relay server (WebSocket URL)</string>
+    <string name="server_url_hint">wss://host/path</string>
+    <string name="server_url_help">Known hosts auto-bind the matching relay key. Default is wss://tele.karlson.ru/ws. Change requires Stop sharing → start to take effect.</string>
+    <string name="server_save">Save</string>
+    <string name="server_saved">Saved — restart sharing to apply</string>
+    <string name="server_invalid">URL must start with ws:// or wss://</string>
+    <string name="server_unknown_keys">Custom host — relay keys will use the built-in fallback. Edit only if you know the relay\'s X25519/Ed25519 public keys match.</string>
+
+    <!-- Brand block (English, as requested) -->
+    <string name="brand_block">My name is Leo Kaganov. I\'m an engineer working on embedded devices and network communication protocols. If you like my work and your company has tasks for me, I\'d be glad to collaborate:\n\nLLeo@LLeo.me\nTelegram: @lleokaganov</string>
+
+    <!-- About copy -->
+    <string name="about_body">wsusb shares a USB device plugged into this phone with a remote computer through an encrypted relay, so the computer sees the device as if it were locally attached.\n\nThe phone is the gate. The computer becomes an owner on first connection (TOFU).</string>
+
+    <!-- Battery optimization whitelist -->
+    <string name="battery_opt_title">Keep wsusb awake</string>
+    <string name="battery_opt_message">For the relay to stay connected while the screen is off, please remove battery restrictions for wsusb in the next screen.</string>
+    <string name="battery_opt_continue">Open settings</string>
+    <string name="battery_opt_skip">Not now</string>
 </resources>
