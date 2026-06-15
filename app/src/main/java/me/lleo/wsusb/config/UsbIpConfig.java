@@ -21,7 +21,6 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.PowerManager;
-import android.provider.Settings;
 import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
@@ -159,8 +158,9 @@ public class UsbIpConfig extends ComponentActivity {
 		forgetOwnersButton = findViewById(R.id.forgetOwnersButton);
 		dotTx = findViewById(R.id.dotTx);
 		dotRx = findViewById(R.id.dotRx);
-		appVersion = findViewById(R.id.appVersion);
-		updateButton = findViewById(R.id.updateButton);
+		connDot = findViewById(R.id.connDot);
+		connStatus = findViewById(R.id.connStatus);
+		settingsButton = findViewById(R.id.settingsButton);
 
 		serviceRunning = isMyServiceRunning(UsbIpService.class);
 
@@ -251,16 +251,10 @@ public class UsbIpConfig extends ComponentActivity {
 			}
 		});
 
-		// App section: show the installed version and offer an in-app self-update.
-		int versionCode = Updater.getInstalledVersionCode(this);
-		String versionName = Updater.getInstalledVersionName(this);
-		appVersion.setText(getString(R.string.app_version_label)
-				+ " " + versionCode + " (" + versionName + ")");
-
-		updateButton.setOnClickListener(new OnClickListener() {
+		settingsButton.setOnClickListener(new OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				Updater.checkForUpdate(UsbIpConfig.this);
+				startActivity(new Intent(UsbIpConfig.this, SettingsActivity.class));
 			}
 		});
 	}
@@ -298,6 +292,63 @@ public class UsbIpConfig extends ComponentActivity {
 		// requestPermission() explicitly here forces the dialog every time the
 		// user opens the app, so they can grant and we can proceed.
 		ensureUsbPermission();
+
+		// One-shot prompt: ask the user to whitelist us from battery
+		// optimizations so the WS link stays alive while the screen is off.
+		// Skipped silently if already whitelisted or if the user dismissed it.
+		maybePromptBatteryWhitelist();
+	}
+
+	/**
+	 * Show the "ignore battery optimizations" prompt at most once per install
+	 * (or until the user grants it). Doze + per-app battery restrictions are
+	 * the main reason the relay subprocess loses CPU and the WS link drops in
+	 * the background; whitelisting wsusb keeps the foreground service genuinely
+	 * unrestricted.
+	 */
+	private void maybePromptBatteryWhitelist() {
+		// REQUEST_IGNORE_BATTERY_OPTIMIZATIONS + isIgnoringBatteryOptimizations
+		// arrived in API 23 (Doze itself was a no-op below that).
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+		Settings s = new Settings(this);
+		if (s.isBatteryPromptDone()) return;
+		PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+		if (pm == null) return;
+		if (pm.isIgnoringBatteryOptimizations(getPackageName())) {
+			s.markBatteryPromptDone();
+			return;
+		}
+		new AlertDialog.Builder(this)
+				.setTitle(R.string.battery_opt_title)
+				.setMessage(R.string.battery_opt_message)
+				.setPositiveButton(R.string.battery_opt_continue,
+						new DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+						try {
+							Intent i = new Intent(
+									android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+									Uri.parse("package:" + getPackageName()));
+							startActivity(i);
+						} catch (Exception e) {
+							// Fall back to the global battery-optimizations list.
+							try {
+								startActivity(new Intent(
+										android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+							} catch (Exception ignored) {
+							}
+						}
+						new Settings(UsbIpConfig.this).markBatteryPromptDone();
+					}
+				})
+				.setNegativeButton(R.string.battery_opt_skip,
+						new DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+						new Settings(UsbIpConfig.this).markBatteryPromptDone();
+					}
+				})
+				.show();
 	}
 
 	/** PendingIntent used to receive USB permission grant results. */
@@ -501,9 +552,13 @@ public class UsbIpConfig extends ComponentActivity {
 					relayWord = getString(R.string.relay_connecting);
 					color = R.color.status_warn;
 					break;
+				case DISCONNECTED:
+					relayWord = getString(R.string.relay_connecting);
+					color = R.color.status_bad;
+					break;
 				case ERROR:
 					relayWord = getString(R.string.relay_error);
-					color = R.color.status_warn;
+					color = R.color.status_bad;
 					break;
 				case OFF:
 				default:
@@ -520,6 +575,47 @@ public class UsbIpConfig extends ComponentActivity {
 		// Stop button is a manual override: only shown while something is active.
 		boolean active = relayActive || serviceRunning;
 		stopSharingButton.setVisibility(active ? View.VISIBLE : View.GONE);
+
+		// Prominent server-connection dot+label at the top: red/amber/green
+		// derived from the live relay state, independent of USB device presence.
+		updateConnectionIndicator(relayState);
+	}
+
+	/**
+	 * Top-of-screen indicator. Red = relay not connected (or error). Amber =
+	 * subprocess starting / connecting. Green = WS link to the relay is up.
+	 * Grey = off (no subprocess yet).
+	 */
+	private void updateConnectionIndicator(RelayController.State relayState) {
+		int colorId;
+		int textId;
+		switch (relayState) {
+			case ON:
+				colorId = R.color.status_ok;
+				textId = R.string.conn_status_connected;
+				break;
+			case CONNECTING:
+				colorId = R.color.status_warn;
+				textId = R.string.conn_status_connecting;
+				break;
+			case DISCONNECTED:
+				colorId = R.color.status_bad;
+				textId = R.string.conn_status_disconnected;
+				break;
+			case ERROR:
+				colorId = R.color.status_bad;
+				textId = R.string.conn_status_error;
+				break;
+			case OFF:
+			default:
+				colorId = R.color.status_idle;
+				textId = R.string.conn_status_off;
+				break;
+		}
+		int tint = ContextCompat.getColor(this, colorId);
+		connDot.setBackgroundTintList(android.content.res.ColorStateList.valueOf(tint));
+		connStatus.setText(textId);
+		connStatus.setTextColor(tint);
 	}
 
 	/**
