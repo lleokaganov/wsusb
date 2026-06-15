@@ -107,6 +107,12 @@ public class RelayController {
     // talking to — distinct from whatever is currently saved in prefs (which
     // only takes effect on the next start).
     private String currentRelayUrl;
+    // True while we're supposed to keep the relay running (set by start(),
+    // cleared by stop()). If the subprocess dies while this is true, the
+    // watchdog respawns it after a short delay — covers Android killing the
+    // process, the local USB/IP server closing its accept-side on the last
+    // detach, and other transient deaths.
+    private boolean shouldBeRunning;
 
     public RelayController(Context context) {
         // Hold the application context to avoid leaking the Activity.
@@ -332,6 +338,7 @@ public class RelayController {
      * remembered owners, per the authorized table).
      */
     public synchronized void start() {
+        shouldBeRunning = true;
         if (process != null) {
             // Already running.
             return;
@@ -350,6 +357,7 @@ public class RelayController {
 
     /** Stops the relay process if running. Safe to call when already stopped. */
     public synchronized void stop() {
+        shouldBeRunning = false;
         Process p = process;
         Thread t = logThread;
         process = null;
@@ -484,6 +492,7 @@ public class RelayController {
         }
         Log.i(TAG, "relay process exited (code=" + exit + ")");
 
+        boolean respawn = false;
         synchronized (this) {
             // Only flip to OFF if this is still the current process (i.e. it died
             // on its own rather than being replaced by a restart).
@@ -491,8 +500,34 @@ public class RelayController {
                 process = null;
                 logThread = null;
                 currentRelayUrl = null;
-                setState(State.OFF);
+                // If we're still supposed to be running (stop() wasn't called),
+                // schedule a respawn so transient deaths — the local USB/IP
+                // server closing our TCP on detach, Android battery killing
+                // the subprocess, etc — don't leave the user with a grey dot.
+                if (shouldBeRunning) {
+                    setState(State.DISCONNECTED);
+                    respawn = true;
+                } else {
+                    setState(State.OFF);
+                }
             }
+        }
+        if (respawn) {
+            // Small delay so we don't spin if the subprocess fails immediately
+            // (e.g. binary missing). Mirrors usbws's own internal retry cadence.
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try { Thread.sleep(3000); } catch (InterruptedException ignored) {}
+                    synchronized (RelayController.this) {
+                        // Bail if the caller has since stopped us, or another
+                        // start has already raised a new process meanwhile.
+                        if (!shouldBeRunning || process != null) return;
+                    }
+                    Log.i(TAG, "relay subprocess died — respawning");
+                    start();
+                }
+            }, "usbws-respawn").start();
         }
     }
 
