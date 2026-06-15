@@ -538,48 +538,58 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 								msg.transferBufferLength, msg.direction == UsbIpDevicePacket.USBIP_DIR_IN ? "in" : "out",
 										selectedEndpoint.getEndpointNumber());
 					}
-					
+
+					// Short poll, then return a zero-length successful URB on
+					// timeout instead of the old "do-while -110" infinite spin.
+					//
+					// Why: CDC / USB-serial chips (CH340 via ch341_uart, FTDI,
+					// CP2102, cdc-acm) attach an interrupt-IN endpoint to
+					// notify modem-line status changes (DSR/CTS/RI/DCD). On
+					// idle lines that endpoint never fires, so the old loop
+					// never replied — the ch341 driver gave up after ~20 ms
+					// and UNLINK'd the URB, taking the whole open() with it.
+					// Answering "URB completed, no data" lets the driver
+					// resubmit at its own pace and the port opens cleanly.
 					int res;
-					do {
-						res = XferUtils.doInterruptTransfer(context.devConn, selectedEndpoint, buff.array(), 1000);
-						
-						if (context.requestPool.isShutdown()) {
-							// Bail if the queue is being torn down
-							return;
-						}
-						
-						if (!context.activeMessages.contains(msg)) {
-							// Somebody cancelled the URB, return without responding
-							return;
-						}
-					} while (res == -110); // ETIMEDOUT
-					
+					synchronized (selectedEndpoint) {
+						res = XferUtils.doInterruptTransfer(
+								context.devConn, selectedEndpoint, buff.array(), 100);
+					}
+
+					if (context.requestPool.isShutdown()) {
+						return;
+					}
+					if (!context.activeMessages.remove(msg)) {
+						// Somebody cancelled the URB, return without responding
+						return;
+					}
+
 					if (DEBUG) {
 						System.out.printf("Interrupt transfer complete with %d bytes (wanted %d)\n",
 								res, msg.transferBufferLength);
 					}
 
-					if (!context.activeMessages.remove(msg)) {
-						// Somebody cancelled the URB, return without responding
-						return;
-					}
-					
-					if (res < 0) {
+					if (res == -110) {
+						// No status notification within the poll window — legitimate
+						// USB outcome, not an error. Tell the driver "URB completed,
+						// zero length"; it will resubmit when it wants the next poll.
+						reply.actualLength = 0;
+						reply.status = ProtoDefs.ST_OK;
+					} else if (res < 0) {
 						reply.status = res;
 
-						// If the request failed, let's see if the device is still around
+						// If the request failed for a non-timeout reason, see if
+						// the device is still around (real disconnect path).
 						UsbDevice dev = getDevice(deviceId);
 						if (dev == null) {
-							// The device is gone, so terminate the client
 							server.killClient(s);
 							return;
 						}
-					}
-					else {
+					} else {
 						reply.actualLength = res;
 						reply.status = ProtoDefs.ST_OK;
 					}
-					
+
 					sendReply(s, reply, reply.status);
 				}
 				else {
