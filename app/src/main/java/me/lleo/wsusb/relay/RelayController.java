@@ -5,11 +5,8 @@ import android.util.Log;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 import me.lleo.wsusb.config.Settings;
@@ -158,109 +155,46 @@ public class RelayController {
         start();
     }
 
-    /** One authorized owner parsed from the authorized table. */
-    public static final class Owner {
-        /** Full x_pub hex (64 chars). */
-        public final String xPubHex;
-        /** Optional nick (may be empty). */
-        public final String nick;
-
-        Owner(String xPubHex, String nick) {
-            this.xPubHex = xPubHex;
-            this.nick = nick;
-        }
-
-        /** First 8 + last 4 hex chars, for a compact UI line. */
-        public String shortKey() {
-            if (xPubHex.length() <= 12) {
-                return xPubHex;
-            }
-            return xPubHex.substring(0, 8) + "…" + xPubHex.substring(xPubHex.length() - 4);
-        }
-    }
-
-    /**
-     * Reads the authorized-owners table written by usbws. Returns the parsed
-     * owners (possibly empty) — an empty/missing file means trust-on-first-use
-     * is still active and no owner has connected yet.
-     */
-    public List<Owner> getOwners() {
-        List<Owner> owners = new ArrayList<>();
-        File file = authorizedFile();
-        if (!file.exists()) {
-            return owners;
-        }
-        BufferedReader br = null;
-        try {
-            br = new BufferedReader(new FileReader(file));
-            String line;
-            while ((line = br.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("#")) {
-                    continue;
-                }
-                // "<hex64> [nick...]" — split off the first whitespace-delimited token.
-                int sp = indexOfWhitespace(line);
-                String hex;
-                String nick;
-                if (sp < 0) {
-                    hex = line;
-                    nick = "";
-                } else {
-                    hex = line.substring(0, sp);
-                    nick = line.substring(sp).trim();
-                }
-                owners.add(new Owner(hex, nick));
-            }
-        } catch (IOException e) {
-            Log.w(TAG, "failed to read authorized table", e);
-        } finally {
-            if (br != null) {
-                try {
-                    br.close();
-                } catch (IOException ignored) {
-                }
-            }
-        }
-        return owners;
-    }
-
-    /**
-     * Deletes the authorized-owners table so TOFU re-arms on the next connect.
-     * Use when a previously-trusted owner has rotated keys (e.g. their identity
-     * file was regenerated) and the gate now silently refuses them. Returns true
-     * if the file was deleted or did not exist; false on a real I/O failure.
-     */
-    public boolean clearAuthorized() {
-        File file = authorizedFile();
-        if (!file.exists()) {
-            return true;
-        }
-        boolean ok = file.delete();
-        if (!ok) {
-            Log.w(TAG, "failed to delete authorized table at " + file.getAbsolutePath());
-        }
-        return ok;
-    }
-
-    /** Index of the first whitespace char in s, or -1 if none. */
-    private static int indexOfWhitespace(String s) {
-        for (int i = 0; i < s.length(); i++) {
-            if (Character.isWhitespace(s.charAt(i))) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
     /** Absolute path to the per-device identity file in filesDir. */
     private File identityFile() {
         return new File(appContext.getFilesDir(), IDENTITY_FILE);
     }
 
-    /** Absolute path to the authorized-owners table in filesDir. */
+    /** Absolute path to the (legacy) authorized-owners table in filesDir. */
     private File authorizedFile() {
         return new File(appContext.getFilesDir(), AUTHORIZED_FILE);
+    }
+
+    /**
+     * Rotate this device's identity: deletes the keypair and the legacy
+     * authorized table, then restarts the subprocess (which will load-or-
+     * create a fresh keypair). The old invite immediately stops working;
+     * the new invite is whatever generateInvite() returns afterwards.
+     *
+     * Use this when the previous invite leaked or you just want a fresh
+     * one. The subprocess MUST be restarted because the running instance
+     * holds the old x_pub in memory.
+     */
+    public synchronized boolean resetIdentity() {
+        boolean wasRunning = (process != null);
+        if (wasRunning) {
+            stop();
+        }
+        boolean ok = true;
+        File id = identityFile();
+        if (id.exists() && !id.delete()) {
+            Log.w(TAG, "could not delete identity at " + id.getAbsolutePath());
+            ok = false;
+        }
+        File auth = authorizedFile();
+        if (auth.exists() && !auth.delete()) {
+            // Not fatal — table is unused under USBWS_NO_PINNING=1, but tidy.
+            Log.w(TAG, "could not delete legacy authorized table at " + auth.getAbsolutePath());
+        }
+        if (wasRunning) {
+            start();
+        }
+        return ok;
     }
 
     private String binaryPath() {
@@ -419,6 +353,10 @@ public class RelayController {
                 env.put("USBWS_SERVER_X_PUB", keys[0]);
                 env.put("USBWS_SERVER_ED_PUB", keys[1]);
             }
+            // Lab-tool semantics: knowing the invite IS the access. No TOFU
+            // pinning, no authorized table — anyone who knows the invite is
+            // accepted, no surprise rejects after a reinstall.
+            env.put("USBWS_NO_PINNING", "1");
             pb.redirectErrorStream(true);
 
             Log.i(TAG, "starting relay: " + binaryPath + " tcp-connect "

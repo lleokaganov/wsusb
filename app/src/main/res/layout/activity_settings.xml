@@ -107,6 +107,40 @@
             android:text="@string/server_save" />
 
         <!-- =============================================================
+             SECTION — IDENTITY (rotate the keypair / invite)
+             ============================================================= -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:letterSpacing="0.08"
+            android:text="@string/section_identity"
+            android:textColor="@color/section_heading"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="12dp"
+            android:background="@color/separator" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/identity_hint"
+            android:textColor="@color/helper_text"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/resetIdentityButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/reset_identity" />
+
+        <!-- =============================================================
              SECTION — APP (self-update lives here, not on the main screen)
              ============================================================= -->
         <TextView

@@ -69,10 +69,6 @@ public class UsbIpConfig extends ComponentActivity {
 	private TextView myInvite;
 	private Button copyInviteButton;
 
-	// OWNERS section.
-	private TextView ownersList;
-	private Button forgetOwnersButton;
-
 	// Traffic dots (TX/RX) — blinked by RelayController.TrafficListener on each
 	// "STAT tx=N rx=N" stdout line from usbws.
 	private View dotTx;
@@ -146,8 +142,6 @@ public class UsbIpConfig extends ComponentActivity {
 		stopSharingButton = findViewById(R.id.stopSharingButton);
 		myInvite = findViewById(R.id.myInvite);
 		copyInviteButton = findViewById(R.id.copyInviteButton);
-		ownersList = findViewById(R.id.ownersList);
-		forgetOwnersButton = findViewById(R.id.forgetOwnersButton);
 		dotTx = findViewById(R.id.dotTx);
 		dotRx = findViewById(R.id.dotRx);
 		connDot = findViewById(R.id.connDot);
@@ -188,43 +182,9 @@ public class UsbIpConfig extends ComponentActivity {
 			}
 		});
 
-		// Generate (or load) this device's invite off the UI thread, then show it.
-		myInvite.setText("(generating...)");
-		final Handler ui = new Handler(getMainLooper());
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				final String invite = relayController.generateInvite();
-				ui.post(new Runnable() {
-					@Override
-					public void run() {
-						myInvite.setText(invite != null ? invite
-								: "(failed to generate invite, see logcat tag wsusb)");
-					}
-				});
-			}
-		}, "usbws-keygen").start();
-
-		forgetOwnersButton.setOnClickListener(new OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				new AlertDialog.Builder(UsbIpConfig.this)
-						.setTitle(R.string.forget_owners_confirm_title)
-						.setMessage(R.string.forget_owners_confirm_message)
-						.setPositiveButton(R.string.forget_owners, new DialogInterface.OnClickListener() {
-							@Override
-							public void onClick(DialogInterface dialog, int which) {
-								boolean ok = relayController.clearAuthorized();
-								Toast.makeText(UsbIpConfig.this,
-										ok ? R.string.forget_owners_done : R.string.forget_owners_failed,
-										Toast.LENGTH_LONG).show();
-								refreshOwners();
-							}
-						})
-						.setNegativeButton(R.string.cancel, null)
-						.show();
-			}
-		});
+		// Load this device's invite off the UI thread. Called again from
+		// onResume so a Reset identity in Settings is picked up immediately.
+		refreshInvite();
 
 		copyInviteButton.setOnClickListener(new OnClickListener() {
 			@Override
@@ -268,13 +228,16 @@ public class UsbIpConfig extends ComponentActivity {
 		// Pick up the current service state (it may have been stopped externally).
 		serviceRunning = isMyServiceRunning(UsbIpService.class);
 
-		// Reload the owners list each time the screen becomes visible; a new owner
-		// may have been recorded by usbws since we were last shown.
-		refreshOwners();
-
-		// On launch (including being launched by USB_DEVICE_ATTACHED), raise the
-		// bridge if a device is already plugged in (accept mode needs no peer).
+		// On launch (including being launched by USB_DEVICE_ATTACHED), make
+		// sure the relay subprocess + foreground service are up. The relay is
+		// independent of USB devices — every initiator that knows our invite
+		// is accepted (USBWS_NO_PINNING=1), so there is no owners list to
+		// maintain on this side.
 		refreshUsbAndMaybeRaise();
+
+		// In case the user came back from Settings → Reset identity, the
+		// keypair on disk may have rotated; reload the invite text to reflect it.
+		refreshInvite();
 
 		// Force a USB permission dialog for every attached device we don't yet
 		// own. Without this, after a package reinstall Android no longer pops
@@ -674,32 +637,28 @@ public class UsbIpConfig extends ComponentActivity {
 	}
 
 	/**
-	 * Reloads the OWNERS list from the usbws authorized table. Shows a friendly
-	 * "no owners yet" line when the table is empty/missing (TOFU still active),
-	 * otherwise one "shortKey  nick" line per authorized owner.
+	 * Run usbws keygen on a background thread (it's load-or-create — cheap on
+	 * repeat — but does fork() + read a file so it's not UI-thread-safe) and
+	 * paint the result into the YOUR INVITE field. Called on first show and
+	 * again on every resume so the field stays in sync with whatever is on
+	 * disk after a Reset identity in Settings.
 	 */
-	private void refreshOwners() {
-		List<RelayController.Owner> owners = relayController.getOwners();
-		if (owners.isEmpty()) {
-			ownersList.setText(R.string.owners_none);
-			ownersList.setTextColor(ContextCompat.getColor(this, R.color.helper_text));
-			forgetOwnersButton.setVisibility(View.GONE);
-			return;
-		}
-		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < owners.size(); i++) {
-			if (i > 0) {
-				sb.append('\n');
+	private void refreshInvite() {
+		final Handler ui = new Handler(getMainLooper());
+		myInvite.setText("(generating...)");
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				final String invite = relayController.generateInvite();
+				ui.post(new Runnable() {
+					@Override
+					public void run() {
+						myInvite.setText(invite != null ? invite
+								: "(failed to generate invite, see logcat tag wsusb)");
+					}
+				});
 			}
-			RelayController.Owner o = owners.get(i);
-			sb.append(o.shortKey());
-			if (o.nick != null && !o.nick.isEmpty()) {
-				sb.append("  ").append(o.nick);
-			}
-		}
-		ownersList.setText(sb.toString());
-		ownersList.setTextColor(ContextCompat.getColor(this, R.color.status_ok));
-		forgetOwnersButton.setVisibility(View.VISIBLE);
+		}, "usbws-keygen").start();
 	}
 
 	// Elegant Stack Overflow solution to querying running services.

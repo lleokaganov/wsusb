@@ -1,5 +1,7 @@
 package me.lleo.wsusb.config;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -34,6 +36,7 @@ public class SettingsActivity extends ComponentActivity {
     private EditText serverUrlInput;
     private TextView serverUrlNote;
     private Button serverSaveButton;
+    private Button resetIdentityButton;
     private Button updateButton;
     private TextView appVersion;
 
@@ -48,6 +51,7 @@ public class SettingsActivity extends ComponentActivity {
         serverUrlInput = findViewById(R.id.serverUrlInput);
         serverUrlNote = findViewById(R.id.serverUrlNote);
         serverSaveButton = findViewById(R.id.serverSaveButton);
+        resetIdentityButton = findViewById(R.id.resetIdentityButton);
         updateButton = findViewById(R.id.updateButton);
         appVersion = findViewById(R.id.appVersion);
 
@@ -89,6 +93,30 @@ public class SettingsActivity extends ComponentActivity {
                     Toast.makeText(SettingsActivity.this,
                             R.string.server_saved, Toast.LENGTH_LONG).show();
                 }
+            }
+        });
+
+        resetIdentityButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new AlertDialog.Builder(SettingsActivity.this)
+                        .setTitle(R.string.reset_identity_confirm_title)
+                        .setMessage(R.string.reset_identity_confirm_message)
+                        .setPositiveButton(R.string.reset_identity,
+                                new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                RelayController rc =
+                                        ((WsusbApp) getApplication()).getRelayController();
+                                boolean ok = rc.resetIdentity();
+                                Toast.makeText(SettingsActivity.this,
+                                        ok ? R.string.reset_identity_done
+                                           : R.string.reset_identity_failed,
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        })
+                        .setNegativeButton(R.string.cancel, null)
+                        .show();
             }
         });
 

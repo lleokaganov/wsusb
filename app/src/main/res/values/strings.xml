@@ -10,9 +10,9 @@
     <!-- Section headings -->
     <string name="section_device">DEVICE</string>
     <string name="section_your_invite">YOUR INVITE</string>
-    <string name="section_owners">OWNERS</string>
     <string name="section_app">APP</string>
     <string name="section_server">SERVER</string>
+    <string name="section_identity">IDENTITY</string>
     <string name="section_about">ABOUT</string>
     <string name="section_brand">BRAND</string>
 
@@ -40,14 +40,13 @@
     <string name="your_invite_hint">Copy this and give it to the remote computer so it can reach you and become an owner.</string>
     <string name="copy">Copy</string>
 
-    <!-- Owners section -->
-    <string name="owners_hint">Computers authorized to use this shared device.</string>
-    <string name="owners_none">No owners yet — first computer that connects with your invite becomes the owner.</string>
-    <string name="forget_owners">Forget owners</string>
-    <string name="forget_owners_confirm_title">Forget all owners?</string>
-    <string name="forget_owners_confirm_message">The next computer that connects with your invite will become the new owner (TOFU). Use this if a previous owner rotated keys and now silently fails to connect.</string>
-    <string name="forget_owners_done">Owners cleared — next connection will be trusted</string>
-    <string name="forget_owners_failed">Could not clear owners — see logcat tag wsusb</string>
+    <!-- Identity / invite rotation (in Settings) -->
+    <string name="identity_hint">The invite is the only secret. Anyone who knows it can attach. Reset to rotate the keypair: the current invite stops working and a fresh one is generated.</string>
+    <string name="reset_identity">Reset identity (new invite)</string>
+    <string name="reset_identity_confirm_title">Rotate identity?</string>
+    <string name="reset_identity_confirm_message">The current invite will stop working immediately. Any remote computer that still has it will need the new invite to connect.</string>
+    <string name="reset_identity_done">Identity rotated — copy the new invite from the main screen</string>
+    <string name="reset_identity_failed">Could not rotate identity — see logcat tag wsusb</string>
     <string name="cancel">Cancel</string>
 
     <!-- Relay status wording (used inside the combined status line) -->

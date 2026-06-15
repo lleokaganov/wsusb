@@ -226,54 +226,6 @@
                 android:text="@string/copy" />
         </LinearLayout>
 
-        <!-- =============================================================
-             SECTION — OWNERS (authorized remotes that may connect)
-             Filled from the usbws "authorized" table. The first remote that
-             connects with our invite is trusted-on-first-use and listed here;
-             afterwards only listed owners are accepted.
-             ============================================================= -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            android:letterSpacing="0.08"
-            android:text="@string/section_owners"
-            android:textColor="@color/section_heading"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="12dp"
-            android:background="@color/separator" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/owners_hint"
-            android:textColor="@color/helper_text"
-            android:textSize="13sp" />
-
-        <TextView
-            android:id="@+id/ownersList"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="@string/owners_none"
-            android:textSize="13sp"
-            android:typeface="monospace" />
-
-        <!-- Visible only when the authorized table is non-empty (see refreshOwners). -->
-        <Button
-            android:id="@+id/forgetOwnersButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="@string/forget_owners"
-            android:visibility="gone" />
-
     </LinearLayout>
 
 </ScrollView>
