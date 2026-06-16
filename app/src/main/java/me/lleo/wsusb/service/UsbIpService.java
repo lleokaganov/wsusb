@@ -478,59 +478,137 @@ public class UsbIpService extends Service implements UsbRequestHandler {
 							+ (msg.direction == UsbIpDevicePacket.USBIP_DIR_IN ? "in" : "out")
 							+ " EP " + selectedEndpoint.getEndpointNumber());
 
-					int res;
-					int retries = 0;
-					do {
-						// UsbDeviceConnection.bulkTransfer() is NOT thread-safe per
-						// endpoint — two concurrent calls on the same endpoint cause
-						// one to fail with -108 (ESHUTDOWN), which we then propagate
-						// as an error and kernel tears the device down. Serialize
-						// per-endpoint to keep the chip happy under load.
-						synchronized (selectedEndpoint) {
-							res = XferUtils.doBulkTransfer(context.devConn, selectedEndpoint, buff.array(), 1000);
-						}
-						retries++;
-						if (retries == 1 || retries % 5 == 0) {
-							android.util.Log.i("wsusb", "Bulk try=" + retries + " res=" + res
-									+ " EP " + selectedEndpoint.getEndpointNumber()
-									+ " " + (msg.direction == UsbIpDevicePacket.USBIP_DIR_IN ? "in" : "out"));
-						}
-
-						if (context.requestPool.isShutdown()) {
-							// Bail if the queue is being torn down
+					if (msg.direction == UsbIpDevicePacket.USBIP_DIR_IN) {
+						// IN direction: use the async UsbRequest API instead of
+						// synchronous bulkTransfer.
+						//
+						// Why: on CH341 (and likely other USB-serial chips) the
+						// kernel-side bulkTransfer occasionally returns a positive
+						// actualLength when the device's RX FIFO is empty —
+						// sometimes with the freshly-zero'd Java buffer
+						// (so 32 NULs end up in the tty stream), sometimes with
+						// stale bytes from a previous successful URB (you see
+						// the tail of a recent line repeating dozens of times).
+						// There is no flag to tell the two apart from
+						// bulkTransfer's return value.
+						//
+						// UsbRequest.queue() + UsbDeviceConnection.requestWait()
+						// reports completion explicitly: buf.position() is the
+						// number of bytes actually transferred, and the
+						// "completed == request" identity check tells us this
+						// reply is genuinely for our URB.
+						android.hardware.usb.UsbRequest req = new android.hardware.usb.UsbRequest();
+						boolean inited = req.initialize(context.devConn, selectedEndpoint);
+						if (!inited) {
+							if (!context.activeMessages.remove(msg)) return;
+							reply.status = -5; // -EIO
+							sendReply(s, reply, reply.status);
 							return;
 						}
 
-						if (!context.activeMessages.contains(msg)) {
-							// Somebody cancelled the URB, return without responding
-							return;
+						int res;
+						boolean usbReqOk = false;
+						// devConn.requestWait() blocks on ANY URB completion on
+						// this connection, so we serialize per-connection to
+						// stop workers from stealing each other's completions.
+						synchronized (context.devConn) {
+							if (!req.queue(buff)) {
+								req.close();
+								if (!context.activeMessages.remove(msg)) return;
+								UsbDevice dev = getDevice(deviceId);
+								if (dev == null) { server.killClient(s); return; }
+								reply.status = -5; // -EIO
+								sendReply(s, reply, reply.status);
+								return;
+							}
+
+							// Cancel-on-timeout: spawn a tiny watchdog that
+							// req.cancel()s if no data arrives within the window.
+							// Cancelled requests still complete via requestWait,
+							// just with buf.position() == 0.
+							final android.hardware.usb.UsbRequest cancelRef = req;
+							final boolean[] timedOut = new boolean[]{false};
+							Thread watchdog = new Thread(new Runnable() {
+								@Override
+								public void run() {
+									try { Thread.sleep(250); }
+									catch (InterruptedException e) { return; }
+									timedOut[0] = true;
+									cancelRef.cancel();
+								}
+							}, "usbws-urb-timeout");
+							watchdog.setDaemon(true);
+							watchdog.start();
+
+							android.hardware.usb.UsbRequest completed = context.devConn.requestWait();
+							watchdog.interrupt();
+
+							if (completed != req) {
+								// Stolen by another worker (shouldn't happen
+								// under our lock, but be defensive); skip reply.
+								req.close();
+								if (!context.activeMessages.remove(msg)) return;
+								reply.actualLength = 0;
+								reply.status = ProtoDefs.ST_OK;
+								sendReply(s, reply, reply.status);
+								return;
+							}
+							// buff.position() now holds exact bytes the kernel
+							// wrote — 0 on timeout/cancel, N on real transfer.
+							res = buff.position();
+							usbReqOk = !timedOut[0] || res > 0;
 						}
-					} while (res == -110); // ETIMEDOUT
+						req.close();
 
-					android.util.Log.i("wsusb", "Bulk DONE res=" + res + " wanted=" + msg.transferBufferLength);
+						if (context.requestPool.isShutdown()) return;
+						if (!context.activeMessages.remove(msg)) return;
 
-					if (!context.activeMessages.remove(msg)) {
-						// Somebody cancelled the URB, return without responding
-						return;
-					}
+						android.util.Log.i("wsusb", "Bulk DONE-in async res=" + res
+								+ " wanted=" + msg.transferBufferLength
+								+ " ok=" + usbReqOk);
 
-					if (res < 0) {
-						// If the request failed, let's see if the device is still around
-						UsbDevice dev = getDevice(deviceId);
-						if (dev == null) {
-							// The device is gone, so terminate the client
-							server.killClient(s);
-							return;
-						}
-
-						reply.status = res;
-					}
-					else {
+						// Whether we timed out (res=0) or got bytes (res>0),
+						// the reply is a successful URB completion — kernel
+						// driver decides whether to resubmit. No stale-data
+						// possible: buff.position() == actual bytes written.
 						reply.actualLength = res;
 						reply.status = ProtoDefs.ST_OK;
-					}
+						sendReply(s, reply, reply.status);
+					} else {
+						// OUT direction: synchronous bulkTransfer is fine here
+						// (write returns "bytes sent" honestly; no FIFO/cache
+						// games). Keep the original do-while retry on -110.
+						int res;
+						int retries = 0;
+						do {
+							synchronized (selectedEndpoint) {
+								res = XferUtils.doBulkTransfer(
+										context.devConn, selectedEndpoint, buff.array(), 1000);
+							}
+							retries++;
+							if (retries == 1 || retries % 5 == 0) {
+								android.util.Log.i("wsusb", "Bulk(out) try=" + retries
+										+ " res=" + res + " EP " + selectedEndpoint.getEndpointNumber());
+							}
+							if (context.requestPool.isShutdown()) return;
+							if (!context.activeMessages.contains(msg)) return;
+						} while (res == -110);
 
-					sendReply(s, reply, reply.status);
+						android.util.Log.i("wsusb", "Bulk DONE-out res=" + res
+								+ " wanted=" + msg.transferBufferLength);
+
+						if (!context.activeMessages.remove(msg)) return;
+
+						if (res < 0) {
+							UsbDevice dev = getDevice(deviceId);
+							if (dev == null) { server.killClient(s); return; }
+							reply.status = res;
+						} else {
+							reply.actualLength = res;
+							reply.status = ProtoDefs.ST_OK;
+						}
+						sendReply(s, reply, reply.status);
+					}
 				}
 				else if (selectedEndpoint.getType() == UsbConstants.USB_ENDPOINT_XFER_INT) {
 					if (DEBUG) {
